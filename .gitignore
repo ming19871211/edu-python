@@ -1,0 +1,12 @@
+/.git
+/.vscode
+/.idea
+*/.idea
+!.gitignore
+*.pyc
+*.log
+*/data/*
+*/log.txt
+*/log.txt
+/venv
+*/venv
