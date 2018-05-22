@@ -67,6 +67,12 @@ class QuestionSpider(scrapy.Spider):
         if not question['answer'] and  not question['list']:
             self.logger.error(u'下载题目没有答案异常，题目Id:%s', question['question_id'])
             raise ValueError(u'下载题目没有答案')
+        #if question.has_key('list'):
+        #    for childe_question in question['list']:
+        #        if not childe_question['answer']:
+        #            self.logger.error(u'下载题目没有答案异常，题目Id:%s', question['question_id'])
+        #            raise ValueError(u'下载题目没有答案')
+
         # if not question['explanation']:
         #     self.logger.error(u'下载题目没有解析异常，题目Id:%s',question['question_id'])
         #     raise ValueError(u'下载题目没有解析')

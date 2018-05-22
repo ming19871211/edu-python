@@ -231,4 +231,6 @@ class MongoDB(object):
     def getCollection(self,collectionName):
         '''获取集合（表）'''
         return self.__db[collectionName]
+    def close(self):
+        self.__conn.close()
 

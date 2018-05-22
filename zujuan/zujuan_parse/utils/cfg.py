@@ -14,8 +14,8 @@ class DBCFG:
     maxconnections=30
 class POSTGRE_CFG:
     '''postgreSql数据库配置'''
-    #host = "localhost"
-    host= "10.10.6.80"
+    host = "localhost"
+    #host= "10.10.6.80"
     port = 24967
     user="root"
     passwd="pangu"
@@ -23,7 +23,7 @@ class POSTGRE_CFG:
 class MongoDB_CFG:
     '''MongoDB数据库配置'''
     host="127.0.0.1"
-    port=27017
+    port=27018
     db_name="zujuan"
 
 
