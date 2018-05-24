@@ -17,7 +17,15 @@ class URL:
 
 class PATH:
     rootPath='data'
+    rootImagPath='zj_image'
     if not os.path.exists(rootPath):os.makedirs(rootPath)
+    if not os.path.exists(rootImagPath): os.makedirs(rootImagPath)
+    # 临时文件后缀
+    tmp_suffix = "-tmp"
+    pic_new_path='zj_image_new/4/2018/5/'
+    if not os.path.exists(pic_new_path): os.makedirs(pic_new_path)
+start_time = 0.0
+image_url = 'http://image.yuncelian.com/4/2018/5/'
 subjects ={
         'chinese':{'chid':2,'name':u'语文','xds':[1,2,3],'code':6},
         'math':{'chid':3,'name':u'数学','xds':[1,2,3],'code':0},

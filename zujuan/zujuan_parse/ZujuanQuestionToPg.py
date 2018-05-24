@@ -108,4 +108,4 @@ class ZujuanQuestion:
 
 if __name__ == '__main__':
     question = ZujuanQuestion()
-    question.paresToPg(10)
+    question.paresToPg(16)

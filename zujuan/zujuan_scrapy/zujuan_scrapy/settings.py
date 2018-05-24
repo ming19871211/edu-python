@@ -148,4 +148,6 @@ curr_subject = {'chid':11,'xd':2,'subjectCode':23,'name':u'生物'}
 # REDIS_HOST = 'localhost'
 # REDIS_PORT = 6379
 
+rootImagPath = 'zj_image'
+tmp_suffix = "-tmp"
 
