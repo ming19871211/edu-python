@@ -41,8 +41,8 @@ class JyeooSelection:
                 resp = self.session.post(category_url,data=data)
                 pk_ul_soup = BeautifulSoup(html_parser.unescape(resp.content), "lxml").find('ul',id='JYE_POINT_TREE_HOLDER')
                 try:
-                    data = self.pareSelection(pk_ul_soup,bk_id,bk_name,ek_id,ek_name,course,1)
-                    coll.insert_many(data)
+                    s_rows = self.pareSelection(pk_ul_soup,bk_id,bk_name,ek_id,ek_name,course,1)
+                    coll.insert_many(s_rows)
                     logger.info(u'完成下载菁优章节，教材名称：%s，年级名称：%s，科目名称：%s-%s，科目主url：%s',ek_name,bk_name,c_name,course[-1],c_url)
                 except  Exception as e:
                     logger.exception(u'分析下载菁优章节异常，教材名称：%s，年级名称：%s，科目名称：%s-%s，科目主url：%s',ek_name,bk_name,course[-1],c_name,c_url)
@@ -50,6 +50,7 @@ class JyeooSelection:
     def pareSelection(self,ul_soup,bk_id,bk_name,ek_id,ek_name,course,level,parent_id=None):
         '''bk：年级，ek: 教材，level：级别，parent_id：上级章节ID'''
         global SEQ
+        rows = []
         for li in  ul_soup.find_all('li',attrs={'pk':True},recursive=False):
             pk_q = li['pk']
             pk_arr = pk_q.split('~')
@@ -66,13 +67,14 @@ class JyeooSelection:
             row = {'type_id':type_id,'type_name':type_name,'ek_id':ek_id,'ek_name':ek_name,'grade_id':bk_id,'grade_name':bk_name,
                    'level':level,'parent_select_id':parent_id,'pk_q':pk_q,'pk_id':pk_id,'pk_name':pk_name,'seq':SEQ,
                    'c_id':course[0],'c_name':course[1],'c_zname':course[2]}
+            rows.append(row)
             SEQ += 1
             child_ul_soup = li.find('ul')
-            rows = []
             if child_ul_soup:
-                rows = self.pareSelection(child_ul_soup,bk_id,bk_name,ek_id,ek_name,course,level+1,pk_id)
-            rows.append(row)
-            return rows
+                rows.extend(self.pareSelection(child_ul_soup,bk_id,bk_name,ek_id,ek_name,course,level+1,pk_id))
+            else:
+                row['isLast'] = True
+        return rows
 
 
 if __name__ == '__main__':
@@ -83,5 +85,5 @@ if __name__ == '__main__':
     finally:
         pg.close()
     for course in c_list:
-        pass
-        #selection.mainSelection(URL.C_URL, URL.CATEGORY_URL,course)
+        #pass
+        selection.mainSelection(URL.C_URL, URL.CATEGORY_URL,course)
