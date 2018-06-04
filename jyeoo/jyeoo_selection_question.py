@@ -40,11 +40,13 @@ class JyeooSelectionQuestion:
         driver.get(URL.ROOT_URL)
         #登录问题
         cookies = None
+        last_time = 0.0
         try:
             cookies = pickle.load(open("cookies.pkl", "rb"))
+            last_time = pickle.load(open("time.pkl", "rb"))
         except Exception as e:
             pass
-        if cookies:
+        if cookies and (time.time()-last_time) < 60*30:
             for cookie in cookies:
                 driver.add_cookie(cookie)
         else:
@@ -96,26 +98,37 @@ class JyeooSelectionQuestion:
                     self.recurSelection(ul_soup,driver)
         finally:
             pickle.dump(driver.get_cookies(), open("cookies.pkl", "wb"))
+            pickle.dump(time.time(),open("time.pkl", "wb"))
 
-    def recurSelection(self,ul_soup,driver):
+    def recurSelection(self,ul_soup,driver,parent_Id=None,parent_name=None):
         '''按章节获取题目'''
         for li_soup in ul_soup.find_all('li',recursive=False):
             pk = li_soup.a['pk']
+            pk_arr = pk.split('~')
             title = li_soup.a['title']
             child_ul_soup = li_soup.find('ul')
             if child_ul_soup:
                 if 'expandable' in li_soup['class']:
                     div_ele = driver.find_element_by_xpath(u"//li/a[@pk='%s'][@title='%s']/../div" % (pk, title))
                     div_ele.click()
-                self.recurSelection(child_ul_soup,driver)
+                self.recurSelection(child_ul_soup,driver,pk_arr[-2],title)
             else:
                 a = driver.find_element_by_xpath(u"//li/a[@pk='%s'][@title='%s']" % (pk,title))
-                #可以判断一下此次是否下载完成
+                selection_id = pk_arr[-2]
+                selection_name = title
+                if pk_arr[-1]:
+                    selection_id = parent_Id
+                    selection_name = parent_name
+                #可以判断一下此次是否下载完成,需要实现
+                # TODO
+                selections = []
+                selections.append({'code':selection_id,'name':selection_name})
+                selections = json.dumps(selections,ensure_ascii=False)
                 a.click()
                 # 分析题干页面
-                self.parseQuestionPg(driver)
+                self.parseQuestionPg(driver,selections)
 
-    def parseQuestionPg(self,driver):
+    def parseQuestionPg(self,driver,selections):
         '''分析分页题目'''
         driver.implicitly_wait(10)
         time.sleep(2)
@@ -138,20 +151,26 @@ class JyeooSelectionQuestion:
                 except Exception as e:
                     pass
             options = json.dumps(options,ensure_ascii=False)
+            dg = re.findall(u'<span>\s*难度：([\d\.]+?)\s*</span>',unicode(li.find('div',attrs={'class':'fieldtip-left'})))[0]
             print(pt1)
             print old_id
             print content
             print options
+            print selections
+            print dg
             #获取解析
             analyze_xpath = "//fieldset[@id='%s']/../div[@class='fieldtip']//i[@class='icon i-analyze']/.." % old_id
             WebDriverWait(driver, 20).until(lambda x: x.find_element_by_xpath(analyze_xpath).is_displayed())
             analyze_ele = driver.find_element_by_xpath(analyze_xpath)
+            time.sleep(1)
+            # driver.execute(Command.MOVE_TO, analyze_ele.location_once_scrolled_into_view)
             webdriver.ActionChains(driver).move_to_element(analyze_ele).perform()
             analyze_ele.click()
             answer, analysis, points =self.getAnswerAndAnalysis(driver)
             print answer
             print analysis
             print points
+
 
         #下一页
         opt_soup = div_soup.find('div',attrs={'class':'page'}).find('option',attrs={'selected':True})
@@ -169,7 +188,7 @@ class JyeooSelectionQuestion:
             #可以调用界面点击或者直接调用函数
             # next_ele.click()
             driver.execute_script(js_goPage)
-            self.parseQuestionPg(driver)
+            self.parseQuestionPg(driver,selections)
 
     def getAnswerAndAnalysis(self,driver):
         WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath("//div[@class='box-wrapper']").is_displayed())
@@ -180,7 +199,8 @@ class JyeooSelectionQuestion:
         hclose_ele = box_wra_elel.find_element_by_xpath(u"//input[@title='关闭']")
         # print box_soup.find('input',attrs={'checked':'checked'},class_="radio s")
         labe_soup = box_soup.find('input', attrs={'checked': 'checked'}, class_="radio s").find_parent()
-        answer = re.findall(u'^([A-Z])．.+$',labe_soup.get_text())[0]
+        answer = re.findall(u'^([A-Z])．.+$',labe_soup.get_text())
+        answer = json.dumps(answer,ensure_ascii=False)
         #解析知识点
         point_soup = box_soup.find('em',text=u'【考点】')
         points = []
@@ -196,8 +216,8 @@ class JyeooSelectionQuestion:
         return (answer,analysis,points)
 
 if __name__ == '__main__':
-    driver = webdriver.Chrome()
-    # driver = webdriver.Firefox()
+    # driver = webdriver.Chrome()
+    driver = webdriver.Firefox()
     driver.maximize_window()
     selection = JyeooSelectionQuestion()
     pg = PostgreSql()
