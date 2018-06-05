@@ -42,8 +42,10 @@ class JyeooSelectionQuestion:
         self.driver.maximize_window()
         self.insert_sql = u'INSERT INTO  t_ques_jyeoo_20180601(qid,answer,analyses,cate,cate_name,content,options,sections,points,subject,difficulty,dg,old_id) ' \
                           'VALUES (uuid_generate_v5(uuid_ns_url(), %s),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+        self.insert_sql_section = u'INSERT INTO t_last_section_20180601(section_id,title,status) VALUES (%s,%s,%s)'
         self.select_sql = u'SELECT qid,sections FROM t_ques_jyeoo_20180601 WHERE old_id=%s'
-        self.update_sql_secs = "UPDATE t_ques_jyeoo_20180601  SET  sections=%s  WHERE  qid=%s "
+        self.select_sql_seciton = u'SELECT section_id,title FROM t_last_section_20180601 WHERE  section_id=%s and status = %s'
+        self.update_sql_secs = u"UPDATE t_ques_jyeoo_20180601  SET  sections=%s  WHERE  qid=%s "
         self.cate = 1
         self.cate_name = '单选题'
 
@@ -107,7 +109,7 @@ class JyeooSelectionQuestion:
                     WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath("//div[@class='tree-head']//a[@data-id='%s']" % grade_id).is_displayed())
                     grade_ele = driver.find_element_by_xpath("//div[@class='tree-head']//a[@data-id='%s']" % grade_id)
                     grade_ele.click()
-                    print ek_id, ek_name, grade_id, grade_name
+                    logger.info(u'选择版本年级%s-%s-%s-%s',ek_id,ek_name,grade_id,grade_name)
                     # 只取treeview的HTML分析,防止页面太大 丢数据
                     tree_xpath = "//ul[@class='treeview']"
                     time.sleep(2)
@@ -134,16 +136,28 @@ class JyeooSelectionQuestion:
             else:
                 a = driver.find_element_by_xpath(u"//li/a[@pk='%s'][@title='%s']" % (pk,title))
                 section_id = pk_arr[-2]
-                selection_name = title
+                section_name = title
                 if pk_arr[-1]:
                     section_id = parent_Id
                     section_name = parent_name
-                #可以判断一下此次是否下载完成,需要实现
-                # TODO
+                #判断此次是否下载完成,完成这直接跳过
+                status = 1
+                r = pg.getOne(self.select_sql_seciton,(pk,status))
+                if r: continue
                 sections = [{'code':section_id,'name':section_name}]
+                if self.browserType == 2:
+                    webdriver.ActionChains(driver).move_to_element(a)
+                else:
+                    webdriver.ActionChains(driver).move_to_element(a).perform()
                 a.click()
                 # 分析题干页面
                 self.parseQuestionPg(driver,sections,course,pg)
+                try:
+                    pg.execute(self.insert_sql_section,(pk,title,status))
+                    pg.commit()
+                except Exception as e:
+                    pg.rollback()
+                    logger.exception(u'保存last章节下载完成标记异常,pk：%s，title：%s',pk,title)
 
     def parseQuestionPg(self,driver,sections,course,pg):
         '''分析分页题目'''
@@ -157,7 +171,17 @@ class JyeooSelectionQuestion:
             try:
                 pt1 = unicode(li.find('div',attrs={'class':'pt1'}))
                 old_id = li.fieldset['id']
-                content = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*.*?<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0][-1]
+                content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
+                content = '%s%s'%(content_arr[0],content_arr[-1])
+                # print content
+                # try:
+                #     sql = 'UPDATE t_ques_jyeoo_20180601 SET content=%s WHERE old_id=%s'
+                #     pg.execute(sql,(content,old_id))
+                #     pg.commit()
+                # except Exception as ex:
+                #     pg.rollback()
+                #     logger.exception(u'更新题干异常：%s，old_id:%s',ex.message,old_id)
+
                 options=[]
                 for td in li.find_all('td',attrs={'class':'selectoption'}):
                     try:
@@ -171,7 +195,6 @@ class JyeooSelectionQuestion:
                 dg = re.findall(u'<span>\s*难度：([\d\.]+?)\s*</span>',unicode(li.find('div',attrs={'class':'fieldtip-left'})))[0]
                 difficulty = 5 - int(float(dg) * 5)
                 # 判断题目是否成在，存在就不要在下载解析了，continue
-                pg = PostgreSql()
                 r = pg.getOne(self.select_sql,(old_id,))
                 if r:
                     qid = r[0]
@@ -191,7 +214,7 @@ class JyeooSelectionQuestion:
                                              e1.message,qid,json.dumps(secs,ensure_ascii=False))
                             raise e1
                     continue
-                print json.dumps(sections, ensure_ascii=False)
+                # print json.dumps(sections, ensure_ascii=False)
                 #获取解析
                 analyze_xpath = u"//fieldset[@id='%s']/../div[@class='fieldtip']//i[@class='icon i-analyze']/.." % old_id
                 WebDriverWait(driver, 20).until(lambda x: x.find_element_by_xpath(analyze_xpath).is_displayed())
@@ -279,7 +302,7 @@ class JyeooSelectionQuestion:
         return (answer,analysis,points)
 
 if __name__ == '__main__':
-    selection = JyeooSelectionQuestion(browserType=1)
+    selection = JyeooSelectionQuestion(browserType=2)
     pg = PostgreSql()
     try:
         c_list = pg.getAll(SQL_SUBJECT)

@@ -151,20 +151,18 @@ class PostgreSql(object):
     def getAll(self,sql,param=None,isdic=False):
         '''执行查询获取所有结果'''
         cur = self.__cur_dic if isdic else self.__cur
-        count = cur.execute(sql,param)  
+        cur.execute(sql,param)
         return cur.fetchall()
 
     def getOne(self,sql,param=None):  
         '''执行查询获取第一条查询结果'''
-        count = self.__cur.execute(sql,param)  
-        if count:  
-            return  self.__cur.fetchone()[0] 
+        self.__cur.execute(sql,param)
+        return  self.__cur.fetchone()
         
     def getMany(self,sql,num,param=None):  
         """  执行查询，并取出num条结果 """       
-        count = self.__cur.execute(sql,param)  
-        if count:  
-            return  self.__cur.fetchmany(num)  
+        self.__cur.execute(sql,param)
+        return  self.__cur.fetchmany(num)
 
     def getIteratorAll(self,sql,param=None,num=1000):
         '''获取分页数据的迭代器，每次分页num条数据\n

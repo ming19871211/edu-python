@@ -19,7 +19,7 @@ class POSTGRE_CFG:
     port = 5432
     user="root"
     passwd="pangu"
-    db="ycl_resource"
+    db="jyeoo"
 class MongoDB_CFG:
     '''MongoDB数据库配置'''
     host="127.0.0.1"
