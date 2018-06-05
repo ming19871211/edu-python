@@ -21,24 +21,34 @@ logger = LoggerUtil.getLogger(__name__)
 html_parser = HTMLParser.HTMLParser()
 logger = LoggerUtil.getLogger(__name__)
 
-driver = None
+
 SQL_SUBJECT = 'select subject_code,subject_ename,subject_zname from t_subject'
 MAX_PAGE=3
+
 class JyeooSelectionQuestion:
     '''根据章节爬取题目'''
-    def __init__(self,features='lxml'):
-        '''features BeautifulSoup 解析的方式:html.parser,lxml,lxml-xml,xml'''
+    def __init__(self,features='lxml',browserType=1):
+        '''features BeautifulSoup 解析的方式:html.parser,lxml,lxml-xml,xml
+            browserType:浏览器类型 1-chrome 2-Firefox
+        '''
         self.session = requests.Session()
         self.maxPage = 3
         self.features = features
-    def mainSelection(self,course):
-        # mongo = MongoDB()
-        # coll = mongo.getCollection(COLL.SELECTION)
+        self.browserType = browserType
+        if browserType == 2:
+            self.driver = webdriver.Firefox()
+        else:
+            self.driver = webdriver.Chrome()
+        self.driver.maximize_window()
+        self.insert_sql = u'INSERT INTO  t_ques_jyeoo_20180601(qid,answer,analyses,cate,cate_name,content,options,sections,points,subject,difficulty,dg,old_id) ' \
+                          'VALUES (uuid_generate_v5(uuid_ns_url(), %s),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+        self.select_sql = u'SELECT qid,sections FROM t_ques_jyeoo_20180601 WHERE old_id=%s'
+        self.update_sql_secs = "UPDATE t_ques_jyeoo_20180601  SET  sections=%s  WHERE  qid=%s "
+        self.cate = 1
+        self.cate_name = '单选题'
 
-        s_main_url = URL.S_MAIN_URL % course[1]
-        logger.info(u'科目：%s,url:%s',course[2],s_main_url)
-        driver.get(URL.ROOT_URL)
-        #登录问题
+    def login(self,driver):
+        '''用户登录'''
         cookies = None
         last_time = 0.0
         try:
@@ -46,14 +56,24 @@ class JyeooSelectionQuestion:
             last_time = pickle.load(open("time.pkl", "rb"))
         except Exception as e:
             pass
-        if cookies and (time.time()-last_time) < 60*30:
+        if cookies and (time.time() - last_time) < 60 * 30:
             for cookie in cookies:
                 driver.add_cookie(cookie)
         else:
             isLog = raw_input(u'若用户已完成登录，请输入“1”：')
             while isLog != '1':
-                isLog=raw_input(u'请再次，若用户已完成登录，请输入“1”：')
+                isLog = raw_input(u'请再次，若用户已完成登录，请输入“1”：')
             logger.info(u'用户确认已登录')
+
+    def mainSelection(self,course,pg):
+        # mongo = MongoDB()
+        # coll = mongo.getCollection(COLL.SELECTION)
+        driver = self.driver
+        s_main_url = URL.S_MAIN_URL % course[1]
+        logger.info(u'科目：%s,url:%s',course[2],s_main_url)
+        driver.get(URL.ROOT_URL)
+        #登录
+        self.login(driver)
         try:
             driver.get(s_main_url)
             driver.implicitly_wait(10)
@@ -86,7 +106,6 @@ class JyeooSelectionQuestion:
                     th_ele.click()
                     WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath("//div[@class='tree-head']//a[@data-id='%s']" % grade_id).is_displayed())
                     grade_ele = driver.find_element_by_xpath("//div[@class='tree-head']//a[@data-id='%s']" % grade_id)
-
                     grade_ele.click()
                     print ek_id, ek_name, grade_id, grade_name
                     # 只取treeview的HTML分析,防止页面太大 丢数据
@@ -95,12 +114,12 @@ class JyeooSelectionQuestion:
                     WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(tree_xpath).is_displayed())
                     tree_html = driver.find_element_by_xpath(tree_xpath).get_attribute('outerHTML') # innerHTML为内部数据
                     ul_soup = BeautifulSoup(tree_html,self.features).find(name='ul', attrs={'class': 'treeview'})
-                    self.recurSelection(ul_soup,driver)
+                    self.recurSelection(ul_soup,driver,course,pg)
         finally:
             pickle.dump(driver.get_cookies(), open("cookies.pkl", "wb"))
             pickle.dump(time.time(),open("time.pkl", "wb"))
 
-    def recurSelection(self,ul_soup,driver,parent_Id=None,parent_name=None):
+    def recurSelection(self,ul_soup,driver,course,pg,parent_Id=None,parent_name=None):
         '''按章节获取题目'''
         for li_soup in ul_soup.find_all('li',recursive=False):
             pk = li_soup.a['pk']
@@ -111,68 +130,100 @@ class JyeooSelectionQuestion:
                 if 'expandable' in li_soup['class']:
                     div_ele = driver.find_element_by_xpath(u"//li/a[@pk='%s'][@title='%s']/../div" % (pk, title))
                     div_ele.click()
-                self.recurSelection(child_ul_soup,driver,pk_arr[-2],title)
+                self.recurSelection(child_ul_soup,driver,course,pg,pk_arr[-2],title)
             else:
                 a = driver.find_element_by_xpath(u"//li/a[@pk='%s'][@title='%s']" % (pk,title))
-                selection_id = pk_arr[-2]
+                section_id = pk_arr[-2]
                 selection_name = title
                 if pk_arr[-1]:
-                    selection_id = parent_Id
-                    selection_name = parent_name
+                    section_id = parent_Id
+                    section_name = parent_name
                 #可以判断一下此次是否下载完成,需要实现
                 # TODO
-                selections = []
-                selections.append({'code':selection_id,'name':selection_name})
-                selections = json.dumps(selections,ensure_ascii=False)
+                sections = [{'code':section_id,'name':section_name}]
                 a.click()
                 # 分析题干页面
-                self.parseQuestionPg(driver,selections)
+                self.parseQuestionPg(driver,sections,course,pg)
 
-    def parseQuestionPg(self,driver,selections):
+    def parseQuestionPg(self,driver,sections,course,pg):
         '''分析分页题目'''
         driver.implicitly_wait(10)
-        time.sleep(2)
-        # root_soup = BeautifulSoup(driver.page_source, self.features)
-        # div_soup = root_soup.find(name='div',attrs={'id':'pageArea'})
-        # 防止加载页面太大丢数据
+        time.sleep(3)
+        #获取题目信息页面
         pageArea_html = driver.find_element_by_id('pageArea').get_attribute('outerHTML')
         div_soup = BeautifulSoup(pageArea_html, self.features)
         #分析分页页面题目
         for li in div_soup.find_all(name='li',attrs={'class':'QUES_LI'}):
-            pt1 = unicode(li.find('div',attrs={'class':'pt1'}))
-            old_id = li.fieldset['id']
-            content = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*.*?<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0][-1]
-            options=[]
-            for td in li.find_all('td',attrs={'class':'selectoption'}):
+            try:
+                pt1 = unicode(li.find('div',attrs={'class':'pt1'}))
+                old_id = li.fieldset['id']
+                content = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*.*?<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0][-1]
+                options=[]
+                for td in li.find_all('td',attrs={'class':'selectoption'}):
+                    try:
+                        option = unicode(td.label)
+                        option = re.findall(u'^<label\s+class[="a-z\sA-Z]*>[A-Z]．(.+)</label>$',option)[0]
+                        options.append(option)
+                    except Exception as e0:
+                        logger.error(u'加工选项异常，原始题目id：%s,选择内容：%s',old_id,unicode(td))
+                        raise e0
+                options = json.dumps(options,ensure_ascii=False)
+                dg = re.findall(u'<span>\s*难度：([\d\.]+?)\s*</span>',unicode(li.find('div',attrs={'class':'fieldtip-left'})))[0]
+                difficulty = 5 - int(float(dg) * 5)
+                # 判断题目是否成在，存在就不要在下载解析了，continue
+                pg = PostgreSql()
+                r = pg.getOne(self.select_sql,(old_id,))
+                if r:
+                    qid = r[0]
+                    secs = r[1]
+                    #判断章节是否已添加到题目总
+                    isNotExists = True
+                    for sec in secs:
+                        if sections[0]['code'] == sec['code']:
+                            isNotExists = False
+                            break
+                    if isNotExists:
+                        secs.extend(sections)
+                        try:
+                            pg.execute(self.update_sql_secs,json.dumps(secs,ensure_ascii=False),qid)
+                        except Exception as e1:
+                            logger.error(u'更新题目章节异常，异常信息：%s，题目id：%s，章节信息：%s',
+                                             e1.message,qid,json.dumps(secs,ensure_ascii=False))
+                            raise e1
+                    continue
+                print json.dumps(sections, ensure_ascii=False)
+                #获取解析
+                analyze_xpath = u"//fieldset[@id='%s']/../div[@class='fieldtip']//i[@class='icon i-analyze']/.." % old_id
+                WebDriverWait(driver, 20).until(lambda x: x.find_element_by_xpath(analyze_xpath).is_displayed())
+                analyze_ele = driver.find_element_by_xpath(analyze_xpath)
+                time.sleep(1)
+                # driver.execute(Command.MOVE_TO, analyze_ele.location_once_scrolled_into_view)
+                if self.browserType == 2:
+                    webdriver.ActionChains(driver).move_to_element(analyze_ele)
+                else:
+                    webdriver.ActionChains(driver).move_to_element(analyze_ele).perform()
+                analyze_ele.click()
+                answer, analyses, points =self.getAnswerAndAnalysis(driver)
+                subject = course[0]
+                #设置插入数据
+                params = (old_id,answer,analyses,self.cate,self.cate_name,content,options,
+                          json.dumps(sections, ensure_ascii=False),points,subject,difficulty,dg,old_id)
                 try:
-                    option = td.label.get_text()
-                    option = re.findall(u'^[A-Z]．(.+)$',option)[0]
-                    options.append(option)
-                except Exception as e:
-                    pass
-            options = json.dumps(options,ensure_ascii=False)
-            dg = re.findall(u'<span>\s*难度：([\d\.]+?)\s*</span>',unicode(li.find('div',attrs={'class':'fieldtip-left'})))[0]
-            print(pt1)
-            print old_id
-            print content
-            print options
-            print selections
-            print dg
-            #获取解析
-            analyze_xpath = "//fieldset[@id='%s']/../div[@class='fieldtip']//i[@class='icon i-analyze']/.." % old_id
-            WebDriverWait(driver, 20).until(lambda x: x.find_element_by_xpath(analyze_xpath).is_displayed())
-            analyze_ele = driver.find_element_by_xpath(analyze_xpath)
-            time.sleep(1)
-            # driver.execute(Command.MOVE_TO, analyze_ele.location_once_scrolled_into_view)
-            webdriver.ActionChains(driver).move_to_element(analyze_ele).perform()
-            analyze_ele.click()
-            answer, analysis, points =self.getAnswerAndAnalysis(driver)
-            print answer
-            print analysis
-            print points
+                    pg.execute(self.insert_sql,params)
+                    pg.commit()
+                except  Exception as e2:
+                    pg.rollback()
+                    logger.error(u'插入菁优题目异常，异常信息%s,插入数据:%s',e2.message,json.dumps(params,ensure_ascii=False))
+                    raise e2
+            except Exception as e:
+                logger.exception(u'分析题目失败,题目原始网页：%s，错误信息：%s',unicode(li),e.message)
+                raise e
+        # 下一页
+        self.next_page(driver,div_soup,sections)
 
 
-        #下一页
+    def next_page(self,driver,div_soup,sections):
+        '''请求下一页'''
         opt_soup = div_soup.find('div',attrs={'class':'page'}).find('option',attrs={'selected':True})
         pages =re.findall('^\s*(\d+?)\s*/\s*(\d+?)\s*$',opt_soup.get_text())[0]
         cur_page = int(pages[0])
@@ -180,51 +231,60 @@ class JyeooSelectionQuestion:
         # 当前页小于总分页数，并且小于最大允许分页
         if cur_page < total_pag and  cur_page < self.maxPage:
             next_ele = driver.find_element_by_xpath(u"//div[@id='pageArea']/div[@class='page']/div[@class='pagertips']/a[@class='next'][@title='下一页']")
-            webdriver.ActionChains(driver).move_to_element(next_ele).perform()
-            # driver.execute(Command.MOVE_TO, next_ele.location_once_scrolled_into_view)
-            js_goPage = next_ele.get_attribute('href').replace('javascript:','')
-            print next_ele.text,js_goPage
-            # time.sleep(3)
-            #可以调用界面点击或者直接调用函数
-            # next_ele.click()
-            driver.execute_script(js_goPage)
-            self.parseQuestionPg(driver,selections)
+            if self.browserType == 2:
+                webdriver.ActionChains(driver).move_to_element(next_ele)
+            else:
+                webdriver.ActionChains(driver).move_to_element(next_ele).perform()
+
+            # 直接调用函数不调用点击
+            # js_goPage = next_ele.get_attribute('href').replace('javascript:','')
+            # logger.info(u'调用下一页函数：%s，当前调用的url:%s',js_goPage,driver.current_url)
+            # driver.execute_script(js_goPage.replace('this', 'arguments[0]'), next_ele)
+
+            # 可以调用界面点击
+            time.sleep(1)
+            next_ele.click()
+            self.parseQuestionPg(driver,sections,course,pg)
 
     def getAnswerAndAnalysis(self,driver):
+        '''获取题目答案与解析'''
         WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath("//div[@class='box-wrapper']").is_displayed())
         time.sleep(1)
         box_wra_elel = driver.find_element_by_xpath("//div[@class='box-wrapper']")
         # with open('text.txt','w') as f: f.write(box_wra_elel.get_attribute('outerHTML'))
         box_soup = BeautifulSoup(box_wra_elel.get_attribute('outerHTML'),self.features)
         hclose_ele = box_wra_elel.find_element_by_xpath(u"//input[@title='关闭']")
-        # print box_soup.find('input',attrs={'checked':'checked'},class_="radio s")
+        # 关闭解析
+        hclose_ele.click()
         labe_soup = box_soup.find('input', attrs={'checked': 'checked'}, class_="radio s").find_parent()
-        answer = re.findall(u'^([A-Z])．.+$',labe_soup.get_text())
+        answer = re.findall(u'^([A-Z])．.*$',labe_soup.get_text())
+        if not answer:
+            logger.error(u'获取解析答案异常,解析文本值:%s',labe_soup.get_text())
+            raise Exception(u'获取解析答案异常,解析文本值:%s',labe_soup.get_text())
         answer = json.dumps(answer,ensure_ascii=False)
         #解析知识点
         point_soup = box_soup.find('em',text=u'【考点】')
         points = []
         for a_soup in point_soup.find_next_siblings('a'):
             know_name = a_soup.get_text()
-            know_id = re.findall(u"openPointCard\(\s*'[a-zA-Z\d]+?'\s*,\s*'([a-zA-Z\d]+?)'\s*\);\s*return\s*false;\s*",a_soup['onclick'])[0]
+            know_id = '0'
+            try:
+                know_id = re.findall(u"openPointCard\(\s*'[a-zA-Z\d]+?'\s*,\s*'([a-zA-Z\d]+?)'\s*\);\s*return\s*false;\s*",a_soup['onclick'])[0]
+            except  Exception as e:
+                logger.exception(u'解析获取知识点ID失败,原始文本：%s，错误信息:%s',a_soup['onclick'],e.message)
             points.append({'code':know_id,'name':know_name})
         points = json.dumps(points,ensure_ascii=False)
         analysis_soup = box_soup.find('em',text=u'【分析】').parent
         analysis = re.findall(u'<div\s+class="pt[\d]"\s*>\s*<!--B[\d]-->\s*(.+?)<!--E[\d]-->\s*</div>',unicode(analysis_soup))[0].replace(u'<em>【分析】</em>','')
-        #关闭解析
-        hclose_ele.click()
         return (answer,analysis,points)
 
 if __name__ == '__main__':
-    # driver = webdriver.Chrome()
-    driver = webdriver.Firefox()
-    driver.maximize_window()
-    selection = JyeooSelectionQuestion()
+    selection = JyeooSelectionQuestion(browserType=1)
     pg = PostgreSql()
     try:
         c_list = pg.getAll(SQL_SUBJECT)
+        for course in c_list:
+            if course[0] == 20:
+                selection.mainSelection(course,pg)
     finally:
         pg.close()
-    for course in c_list:
-        if course[0] == 20:
-            selection.mainSelection(course)
