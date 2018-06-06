@@ -202,6 +202,7 @@ class JyeooSelectionQuestion:
                 pt1 = unicode(li.find('div',attrs={'class':'pt1'}))
                 old_id = li.fieldset['id']
                 content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
+                # content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)?(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
                 content = u'%s%s'%(content_arr[0],content_arr[-1])
                 # print content
                 # try:
