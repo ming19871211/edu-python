@@ -23,11 +23,15 @@ logger = LoggerUtil.getLogger(__name__)
 
 
 SQL_SUBJECT = 'select subject_code,subject_ename,subject_zname from t_subject'
+SQL_SUBJECT_DOWLOAD = 'SELECT subject_id FROM t_grade_ek_20180601 WHERE  status = 1 GROUP BY subject_id'
 MAX_PAGE=3
+#默认设置的最大一次爬取数量
+MAX_QUES_COUNT = 150
+NO_QUES_MESS=u'对不起，当前条件下没有试题，菁优网正在加速解析试题，敬请期待！'
 
 class JyeooSelectionQuestion:
     '''根据章节爬取题目'''
-    def __init__(self,features='lxml',browserType=1):
+    def __init__(self,features='lxml',browserType=1,max_ques_count=MAX_QUES_COUNT):
         '''features BeautifulSoup 解析的方式:html.parser,lxml,lxml-xml,xml
             browserType:浏览器类型 1-chrome 2-Firefox
         '''
@@ -49,7 +53,8 @@ class JyeooSelectionQuestion:
         self.cate = 1
         self.cate_name = '单选题'
         self.question_count = 0
-        self.question_Max_count =1
+        #最大爬题数量
+        self.question_Max_count = max_ques_count
 
     def login(self,driver):
         '''用户登录'''
@@ -61,7 +66,7 @@ class JyeooSelectionQuestion:
         except Exception as e:
             pass
         #2小时内 不用登陆
-        if cookies and (time.time() - last_time) < 60 * 60 * 2:
+        if cookies and (time.time() - last_time) < 60 * 60 * 4:
             for cookie in cookies:
                 driver.add_cookie(cookie)
         else:
@@ -82,13 +87,18 @@ class JyeooSelectionQuestion:
         try:
             driver.get(s_main_url)
             driver.implicitly_wait(10)
-            driver.find_element_by_xpath(u"//table[@class='degree']//tr/td/ul/li/a[contains(.,'选择题')]").click()
+            # driver.find_element_by_xpath(u"//table[@class='degree']//tr/td/ul/li/a[contains(.,'选择题')]").click()
+            driver.find_element_by_xpath(u"//table[@class='degree']//tr/td/ul/li/a[@onclick=\"_setPageData(this,'ct','1')\"]").click()
             # driver.implicitly_wait(10)
             bt_driver = driver.find_element_by_id('JYE_BOOK_TREE_HOLDER')
             bt_soup = BeautifulSoup(bt_driver.get_attribute('outerHTML'),self.features)
             for ek_soup in bt_soup.find_all('li',attrs={'ek':True}):
                 ek_id = ek_soup['ek']
                 ek_name = ek_soup['nm']
+                # 判断此教材是否要下载
+                select_sql_e = 'select ek_id from t_grade_ek_20180601 WHERE ek_id=%s AND subject_id=%s AND status = 1'
+                r = pg.getOne(select_sql_e,(ek_id,course[0]))
+                if not r : continue
                 # 点击选择教材版本
                 driver.implicitly_wait(10)
                 WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath("//div[@class='tree-head']").is_displayed())
@@ -102,6 +112,10 @@ class JyeooSelectionQuestion:
                 for bk_soup in ek_soup.find_all('li',attrs={'bk':True}):
                     grade_id = bk_soup['bk']
                     grade_name = bk_soup['nm']
+                    # 判断此年级是否要下载
+                    select_sql_g = 'select grade_id from t_grade_ek_20180601 WHERE grade_id=%s AND ek_id=%s AND subject_id=%s AND status = 1'
+                    r = pg.getOne(select_sql_g, (grade_id,ek_id, course[0]))
+                    if not r: continue
                     #点击选择年级
                     driver.implicitly_wait(10)
                     WebDriverWait(driver, 10).until(lambda x : x.find_element_by_xpath("//div[@class='tree-head']").is_displayed())
@@ -120,6 +134,14 @@ class JyeooSelectionQuestion:
                     tree_html = driver.find_element_by_xpath(tree_xpath).get_attribute('outerHTML') # innerHTML为内部数据
                     ul_soup = BeautifulSoup(tree_html,self.features).find(name='ul', attrs={'class': 'treeview'})
                     self.recurSelection(ul_soup,driver,course,pg)
+                    update_sql_g = 'UPDATE t_grade_ek_20180601 SET status=2  WHERE grade_id=%s AND ek_id=%s AND subject_id=%s '
+                    try:
+                        pg.execute(update_sql_g,(grade_id,ek_id,course[0]))
+                        pg.commit()
+                    except Exception as e:
+                        pg.rollback()
+                        logger.exception(u'学科：%s，版本：%，年级：%s，下载完成标记异常', course[2], ek_name,grade_name)
+
         finally:
             pickle.dump(driver.get_cookies(), open("cookies.pkl", "wb"))
             pickle.dump(time.time(),open("time.pkl", "wb"))
@@ -169,6 +191,11 @@ class JyeooSelectionQuestion:
         #获取题目信息页面
         pageArea_html = driver.find_element_by_id('pageArea').get_attribute('outerHTML')
         div_soup = BeautifulSoup(pageArea_html, self.features)
+        #判断是页面是否有题目
+        if pageArea_html.find(NO_QUES_MESS) > -1:
+            #没有题目
+            logger.info(u'该页面没有题目，%s-%s',course[2],json.dumps(sections,ensure_ascii=False))
+            return
         #分析分页页面题目
         for li in div_soup.find_all(name='li',attrs={'class':'QUES_LI'}):
             try:
@@ -287,7 +314,7 @@ class JyeooSelectionQuestion:
         hclose_ele = box_wra_elel.find_element_by_xpath(u"//input[@title='关闭']")
         hclose_ele.click()
         # 校验解析是否正常
-        if box_wra_html.find(content_verify) == -1 and box_wra_html.find(content_verify.replace('<br/>','<br>')) == -1.:
+        if box_wra_html.find(content_verify) == -1 and box_wra_html.find(content_verify.replace('/>','>').replace(u' ','&nbsp;')) == -1.:
             raise Exception(u'获取题目解析异常，答案解析源码是：%s，校验内容是：%s' % (box_wra_html,content_verify))
         #开始分析
         box_soup = BeautifulSoup(box_wra_html,self.features)
@@ -317,9 +344,14 @@ if __name__ == '__main__':
     selection = JyeooSelectionQuestion(browserType=2)
     pg = PostgreSql()
     try:
+        #查询需要下载菁优题目的学科
+        sd_list = []
+        for s in pg.getAll(SQL_SUBJECT_DOWLOAD):
+            sd_list.append(s[0])
+        #开始下载
         c_list = pg.getAll(SQL_SUBJECT)
         for course in c_list:
-            if course[0] == 20:
+            if course[0] in sd_list:
                 selection.mainSelection(course,pg)
     finally:
         pg.close()
