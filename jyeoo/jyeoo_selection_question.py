@@ -48,6 +48,8 @@ class JyeooSelectionQuestion:
         self.update_sql_secs = u"UPDATE t_ques_jyeoo_20180601  SET  sections=%s  WHERE  qid=%s "
         self.cate = 1
         self.cate_name = '单选题'
+        self.question_count = 0
+        self.question_Max_count =1
 
     def login(self,driver):
         '''用户登录'''
@@ -58,7 +60,8 @@ class JyeooSelectionQuestion:
             last_time = pickle.load(open("time.pkl", "rb"))
         except Exception as e:
             pass
-        if cookies and (time.time() - last_time) < 60 * 30:
+        #2小时内 不用登陆
+        if cookies and (time.time() - last_time) < 60 * 60 * 2:
             for cookie in cookies:
                 driver.add_cookie(cookie)
         else:
@@ -172,7 +175,7 @@ class JyeooSelectionQuestion:
                 pt1 = unicode(li.find('div',attrs={'class':'pt1'}))
                 old_id = li.fieldset['id']
                 content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
-                content = '%s%s'%(content_arr[0],content_arr[-1])
+                content = u'%s%s'%(content_arr[0],content_arr[-1])
                 # print content
                 # try:
                 #     sql = 'UPDATE t_ques_jyeoo_20180601 SET content=%s WHERE old_id=%s'
@@ -226,7 +229,7 @@ class JyeooSelectionQuestion:
                 else:
                     webdriver.ActionChains(driver).move_to_element(analyze_ele).perform()
                 analyze_ele.click()
-                answer, analyses, points =self.getAnswerAndAnalysis(driver)
+                answer, analyses, points =self.getAnswerAndAnalysis(driver,content_arr[-1])
                 subject = course[0]
                 #设置插入数据
                 params = (old_id,answer,analyses,self.cate,self.cate_name,content,options,
@@ -238,6 +241,10 @@ class JyeooSelectionQuestion:
                     pg.rollback()
                     logger.error(u'插入菁优题目异常，异常信息%s,插入数据:%s',e2.message,json.dumps(params,ensure_ascii=False))
                     raise e2
+                self.question_count +=1
+                if self.question_count >= self.question_Max_count:
+                    raise Exception(u'停止爬题，今日爬取数量：%d,已达到最大值：%d' % (self.question_count,self.question_Max_count))
+
             except Exception as e:
                 logger.exception(u'分析题目失败,题目原始网页：%s，错误信息：%s',unicode(li),e.message)
                 raise e
@@ -269,16 +276,21 @@ class JyeooSelectionQuestion:
             next_ele.click()
             self.parseQuestionPg(driver,sections,course,pg)
 
-    def getAnswerAndAnalysis(self,driver):
+    def getAnswerAndAnalysis(self,driver,content_verify):
         '''获取题目答案与解析'''
         WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath("//div[@class='box-wrapper']").is_displayed())
         time.sleep(1)
         box_wra_elel = driver.find_element_by_xpath("//div[@class='box-wrapper']")
         # with open('text.txt','w') as f: f.write(box_wra_elel.get_attribute('outerHTML'))
-        box_soup = BeautifulSoup(box_wra_elel.get_attribute('outerHTML'),self.features)
-        hclose_ele = box_wra_elel.find_element_by_xpath(u"//input[@title='关闭']")
+        box_wra_html = box_wra_elel.get_attribute('outerHTML')
         # 关闭解析
+        hclose_ele = box_wra_elel.find_element_by_xpath(u"//input[@title='关闭']")
         hclose_ele.click()
+        # 校验解析是否正常
+        if box_wra_html.find(content_verify) == -1 and box_wra_html.find(content_verify.replace('<br/>','<br>')) == -1.:
+            raise Exception(u'获取题目解析异常，答案解析源码是：%s，校验内容是：%s' % (box_wra_html,content_verify))
+        #开始分析
+        box_soup = BeautifulSoup(box_wra_html,self.features)
         labe_soup = box_soup.find('input', attrs={'checked': 'checked'}, class_="radio s").find_parent()
         answer = re.findall(u'^([A-Z])．.*$',labe_soup.get_text())
         if not answer:
