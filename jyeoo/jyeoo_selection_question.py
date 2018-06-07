@@ -25,8 +25,8 @@ logger = LoggerUtil.getLogger(__name__)
 SQL_SUBJECT = 'select subject_code,subject_ename,subject_zname from t_subject'
 SQL_SUBJECT_DOWLOAD = 'SELECT subject_id FROM t_grade_ek_20180601 WHERE  status = 1 GROUP BY subject_id'
 MAX_PAGE=3
-#默认设置的最大一次爬取数量
-MAX_QUES_COUNT = 150
+#默认设置的最大一次爬取数量,VIP账号默认最大爬取量为200
+MAX_QUES_COUNT = 200
 NO_QUES_MESS=u'对不起，当前条件下没有试题，菁优网正在加速解析试题，敬请期待！'
 
 class JyeooSelectionQuestion:
@@ -266,8 +266,8 @@ class JyeooSelectionQuestion:
                     pg.execute(self.insert_sql,params)
                     pg.commit()
                 except  Exception as e2:
-                    pg.rollback()
                     logger.error(u'插入菁优题目异常，异常信息%s,插入数据:%s',e2.message,json.dumps(params,ensure_ascii=False))
+                    pg.rollback()
                     raise e2
                 self.question_count +=1
                 if self.question_count >= self.question_Max_count:
