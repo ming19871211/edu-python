@@ -14,6 +14,7 @@ from selenium import webdriver
 from selenium.webdriver.remote.command import Command
 from selenium.webdriver.support.ui import WebDriverWait
 import pickle
+import random
 import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -28,10 +29,14 @@ MAX_PAGE=3
 #默认设置的最大一次爬取数量,VIP账号默认最大爬取量为200
 MAX_QUES_COUNT = 200
 NO_QUES_MESS=u'对不起，当前条件下没有试题，菁优网正在加速解析试题，敬请期待！'
-
+PROXY_HOST = '117.78.40.60'
+PROXY_PORT = 8888
+## 13875802165/123456ycl 不使用代理
+## 18163660636/abc123 使用了 117.78.40.60:8888
+ERR_IDS = ['510e061a-5315-4815-95ab-f6c258dfbcd2']
 class JyeooSelectionQuestion:
     '''根据章节爬取题目'''
-    def __init__(self,features='lxml',browserType=1,max_ques_count=MAX_QUES_COUNT):
+    def __init__(self,features='lxml',browserType=1,isPorxy=False,proxy_host=PROXY_HOST,proxy_port=PROXY_PORT,max_ques_count=MAX_QUES_COUNT):
         '''features BeautifulSoup 解析的方式:html.parser,lxml,lxml-xml,xml
             browserType:浏览器类型 1-chrome 2-Firefox
         '''
@@ -40,13 +45,34 @@ class JyeooSelectionQuestion:
         self.features = features
         self.browserType = browserType
         if browserType == 2:
-            self.driver = webdriver.Firefox()
+            if isPorxy:
+                fp = webdriver.FirefoxProfile()
+                # Direct = 0, Manual = 1, PAC = 2, AUTODETECT = 4, SYSTEM = 5
+                logger.info(u'Firefox 使用代理地址：%s:%d', proxy_host,proxy_host)
+                fp.set_preference("network.proxy.type", 1)
+                fp.set_preference("network.proxy.http", proxy_host)
+                fp.set_preference("network.proxy.http_port", int(proxy_host))
+                fp.set_preference("general.useragent.override", "whater_useragent")
+                fp.update_preferences()
+                self.driver = webdriver.Firefox(firefox_profile=fp)
+            else:
+                logger.info(u'Firefox 不使用代理')
+                self.driver = webdriver.Firefox()
         else:
-            self.driver = webdriver.Chrome()
+            if isPorxy:
+                logger.info(u'chrome 使用代理地址：%s:%d',proxy_host,proxy_port)
+                chromeOptions = webdriver.ChromeOptions()
+                chromeOptions.add_argument("--proxy-server=http://%s:%d" %(proxy_host,proxy_port))
+                self.driver = webdriver.Chrome(chrome_options=chromeOptions)
+            else:
+                logger.info(u'chrome 不使用代理')
+                self.driver = webdriver.Chrome()
+
+
         self.driver.maximize_window()
         self.insert_sql = u'INSERT INTO  t_ques_jyeoo_20180601(qid,answer,analyses,cate,cate_name,content,options,sections,points,subject,difficulty,dg,old_id) ' \
                           'VALUES (uuid_generate_v5(uuid_ns_url(), %s),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-        self.insert_sql_section = u'INSERT INTO t_last_section_20180601(section_id,title,status) VALUES (%s,%s,%s)'
+        self.insert_sql_section = u'INSERT INTO t_last_section_20180601(section_id,title,status,grade_id) VALUES (%s,%s,%s,%s)'
         self.select_sql = u'SELECT qid,sections FROM t_ques_jyeoo_20180601 WHERE old_id=%s'
         self.select_sql_seciton = u'SELECT section_id,title FROM t_last_section_20180601 WHERE  section_id=%s and status = %s'
         self.update_sql_secs = u"UPDATE t_ques_jyeoo_20180601  SET  sections=%s  WHERE  qid=%s "
@@ -133,7 +159,7 @@ class JyeooSelectionQuestion:
                     WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(tree_xpath).is_displayed())
                     tree_html = driver.find_element_by_xpath(tree_xpath).get_attribute('outerHTML') # innerHTML为内部数据
                     ul_soup = BeautifulSoup(tree_html,self.features).find(name='ul', attrs={'class': 'treeview'})
-                    self.recurSelection(ul_soup,driver,course,pg)
+                    self.recurSelection(ul_soup,driver,course,pg,grade_id)
                     update_sql_g = 'UPDATE t_grade_ek_20180601 SET status=2  WHERE grade_id=%s AND ek_id=%s AND subject_id=%s '
                     try:
                         pg.execute(update_sql_g,(grade_id,ek_id,course[0]))
@@ -146,7 +172,7 @@ class JyeooSelectionQuestion:
             pickle.dump(driver.get_cookies(), open("cookies.pkl", "wb"))
             pickle.dump(time.time(),open("time.pkl", "wb"))
 
-    def recurSelection(self,ul_soup,driver,course,pg,parent_Id=None,parent_name=None):
+    def recurSelection(self,ul_soup,driver,course,pg,grade_id,parent_Id=None,parent_name=None):
         '''按章节获取题目'''
         for li_soup in ul_soup.find_all('li',recursive=False):
             pk = li_soup.a['pk']
@@ -157,7 +183,7 @@ class JyeooSelectionQuestion:
                 if 'expandable' in li_soup['class']:
                     div_ele = driver.find_element_by_xpath(u"//li/a[@pk='%s'][@title='%s']/../div" % (pk, title))
                     div_ele.click()
-                self.recurSelection(child_ul_soup,driver,course,pg,pk_arr[-2],title)
+                self.recurSelection(child_ul_soup,driver,course,pg,grade_id,pk_arr[-2],title)
             else:
                 a = driver.find_element_by_xpath(u"//li/a[@pk='%s'][@title='%s']" % (pk,title))
                 section_id = pk_arr[-2]
@@ -178,7 +204,7 @@ class JyeooSelectionQuestion:
                 # 分析题干页面
                 self.parseQuestionPg(driver,sections,course,pg)
                 try:
-                    pg.execute(self.insert_sql_section,(pk,title,status))
+                    pg.execute(self.insert_sql_section,(pk,title,status,grade_id))
                     pg.commit()
                 except Exception as e:
                     pg.rollback()
@@ -226,6 +252,7 @@ class JyeooSelectionQuestion:
                 dg = re.findall(u'<span>\s*难度：([\d\.]+?)\s*</span>',unicode(li.find('div',attrs={'class':'fieldtip-left'})))[0]
                 difficulty = 5 - int(float(dg) * 5)
                 # 判断题目是否成在，存在就不要在下载解析了，continue
+                if old_id in ERR_IDS: continue
                 r = pg.getOne(self.select_sql,(old_id,))
                 if r:
                     qid = r[0]
@@ -307,7 +334,8 @@ class JyeooSelectionQuestion:
     def getAnswerAndAnalysis(self,driver,content_verify):
         '''获取题目答案与解析'''
         WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath("//div[@class='box-wrapper']").is_displayed())
-        time.sleep(1)
+        #随机等待1,5
+        time.sleep(random.randint(1,5))
         box_wra_elel = driver.find_element_by_xpath("//div[@class='box-wrapper']")
         # with open('text.txt','w') as f: f.write(box_wra_elel.get_attribute('outerHTML'))
         box_wra_html = box_wra_elel.get_attribute('outerHTML')
@@ -342,7 +370,7 @@ class JyeooSelectionQuestion:
         return (answer,analysis,points)
 
 if __name__ == '__main__':
-    selection = JyeooSelectionQuestion(browserType=2)
+    selection = JyeooSelectionQuestion(browserType=1,isPorxy=False)
     pg = PostgreSql()
     try:
         #查询需要下载菁优题目的学科
