@@ -31,6 +31,8 @@ MAX_QUES_COUNT = 200
 NO_QUES_MESS=u'对不起，当前条件下没有试题，菁优网正在加速解析试题，敬请期待！'
 PROXY_HOST = '117.78.40.60'
 PROXY_PORT = 8888
+IS_PROXY=False #不使用代理Fasle
+BROWSER_TYPE = 1 #1-chrome
 ## 13875802165/123456ycl 不使用代理
 ## 18163660636/abc123 使用了 117.78.40.60:8888
 ERR_IDS = ['510e061a-5315-4815-95ab-f6c258dfbcd2']
@@ -92,7 +94,7 @@ class JyeooSelectionQuestion:
         except Exception as e:
             pass
         #2小时内 不用登陆
-        if cookies and (time.time() - last_time) < 60 * 60 * 4:
+        if cookies and (time.time() - last_time) < 60 * 60 * 2:
             for cookie in cookies:
                 driver.add_cookie(cookie)
         else:
@@ -370,7 +372,7 @@ class JyeooSelectionQuestion:
         return (answer,analysis,points)
 
 if __name__ == '__main__':
-    selection = JyeooSelectionQuestion(browserType=1,isPorxy=False)
+    selection = JyeooSelectionQuestion(browserType=BROWSER_TYPE,isPorxy=IS_PROXY)
     pg = PostgreSql()
     try:
         #查询需要下载菁优题目的学科
