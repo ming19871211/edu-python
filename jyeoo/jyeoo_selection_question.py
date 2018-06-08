@@ -15,24 +15,36 @@ from selenium.webdriver.remote.command import Command
 from selenium.webdriver.support.ui import WebDriverWait
 import pickle
 import random
+from ConfigParser import ConfigParser
 import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
 logger = LoggerUtil.getLogger(__name__)
 html_parser = HTMLParser.HTMLParser()
 logger = LoggerUtil.getLogger(__name__)
+config = ConfigParser()
+config.read('jyeoo.cfg')
+SELECTION_JYEOO = 'jyeoo'
+def getCFGInt(params_name,default=None): return config.getint(SELECTION_JYEOO,params_name)if config.has_option(SELECTION_JYEOO,params_name) else default
+def getCFG(params_name,default=None): return config.get(SELECTION_JYEOO,params_name)if config.has_option(SELECTION_JYEOO,params_name) else default
+def getCFGBool(params_name,default=None): return config.getboolean(SELECTION_JYEOO,params_name)if config.has_option(SELECTION_JYEOO,params_name) else default
+
+MAX_PAGE= getCFGInt('max_page',3)
+#默认设置的最大一次爬取数量,VIP账号默认最大爬取量为200
+MAX_QUES_COUNT = getCFGInt('max_ques_count',200)
+NO_QUES_MESS=u'对不起，当前条件下没有试题，菁优网正在加速解析试题，敬请期待！'
+PROXY_HOST = getCFG('proxy_host','117.78.40.60')
+PROXY_PORT = getCFGInt('proxy_port',8888)
+IS_PROXY= getCFGBool('is_proxy',False) #不使用代理Fasle
+BROWSER_TYPE = getCFGInt('browser_type',1) #1-chrome
+#随机等待的最大最小时间
+WAIT_MAX_TIME = getCFGInt('wait_max_time',5)
+WAIT_MIN_TIME = getCFGInt('wait_min_time',1)
 
 
 SQL_SUBJECT = 'select subject_code,subject_ename,subject_zname from t_subject'
 SQL_SUBJECT_DOWLOAD = 'SELECT subject_id FROM t_grade_ek_20180601 WHERE  status = 1 GROUP BY subject_id'
-MAX_PAGE=3
-#默认设置的最大一次爬取数量,VIP账号默认最大爬取量为200
-MAX_QUES_COUNT = 200
-NO_QUES_MESS=u'对不起，当前条件下没有试题，菁优网正在加速解析试题，敬请期待！'
-PROXY_HOST = '117.78.40.60'
-PROXY_PORT = 8888
-IS_PROXY=False #不使用代理Fasle
-BROWSER_TYPE = 1 #1-chrome
+
 ## 13875802165/123456ycl 不使用代理
 ## 18163660636/abc123 使用了 117.78.40.60:8888
 ERR_IDS = ['510e061a-5315-4815-95ab-f6c258dfbcd2']
@@ -81,6 +93,7 @@ class JyeooSelectionQuestion:
         self.cate = 1
         self.cate_name = '单选题'
         self.question_count = 0
+        self.err_count = 0
         #最大爬题数量
         self.question_Max_count = max_ques_count
 
@@ -183,7 +196,13 @@ class JyeooSelectionQuestion:
             child_ul_soup = li_soup.find('ul')
             if child_ul_soup:
                 if 'expandable' in li_soup['class']:
+                    WebDriverWait(driver, 20).until(lambda x: x.find_element_by_xpath(
+                        u"//li/a[@pk='%s'][@title='%s']/../div" % (pk, title)).is_displayed())
                     div_ele = driver.find_element_by_xpath(u"//li/a[@pk='%s'][@title='%s']/../div" % (pk, title))
+                    if self.browserType == 2:
+                        webdriver.ActionChains(driver).move_to_element(div_ele)
+                    else:
+                        webdriver.ActionChains(driver).move_to_element(div_ele).perform()
                     div_ele.click()
                 self.recurSelection(child_ul_soup,driver,course,pg,grade_id,pk_arr[-2],title)
             else:
@@ -225,11 +244,20 @@ class JyeooSelectionQuestion:
             logger.info(u'该页面没有题目，%s-%s',course[2],json.dumps(sections,ensure_ascii=False))
             return
         #分析分页页面题目
+        pt1_err_count = 0
         for li in div_soup.find_all(name='li',attrs={'class':'QUES_LI'}):
             try:
                 pt1 = unicode(li.find('div',attrs={'class':'pt1'}))
                 old_id = li.fieldset['id']
-                content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
+                try:
+                    content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
+                except IndexError as ie:
+                    pt1_err_count +=1
+                    logger.warn(u'匹配题干异常，源码为:%s',pt1)
+                    if pt1_err_count <=3 :
+                        continue
+                    else:
+                        raise ie
                 # content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)?(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
                 content = u'%s%s'%(content_arr[0],content_arr[-1])
                 # print content
@@ -287,6 +315,7 @@ class JyeooSelectionQuestion:
                     webdriver.ActionChains(driver).move_to_element(analyze_ele).perform()
                 analyze_ele.click()
                 answer, analyses, points =self.getAnswerAndAnalysis(driver,content_arr[-1])
+                if not answer: continue
                 subject = course[0]
                 #设置插入数据
                 params = (old_id,answer,analyses,self.cate,self.cate_name,content,options,
@@ -337,7 +366,7 @@ class JyeooSelectionQuestion:
         '''获取题目答案与解析'''
         WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath("//div[@class='box-wrapper']").is_displayed())
         #随机等待1,5
-        time.sleep(random.randint(1,5))
+        time.sleep(random.randint(WAIT_MIN_TIME,WAIT_MAX_TIME))
         box_wra_elel = driver.find_element_by_xpath("//div[@class='box-wrapper']")
         # with open('text.txt','w') as f: f.write(box_wra_elel.get_attribute('outerHTML'))
         box_wra_html = box_wra_elel.get_attribute('outerHTML')
@@ -346,7 +375,12 @@ class JyeooSelectionQuestion:
         hclose_ele.click()
         # 校验解析是否正常
         if box_wra_html.find(content_verify) == -1 and box_wra_html.find(content_verify.replace('/>','>').replace(u' ','&nbsp;')) == -1.:
-            raise Exception(u'获取题目解析异常，答案解析源码是：%s，校验内容是：%s' % (box_wra_html,content_verify))
+            self.err_count +=1
+            if self.err_count > 2:
+                raise Exception(u'获取题目解析异常，答案解析源码是：%s，校验内容是：%s' % (box_wra_html,content_verify))
+            else:
+                return (None,None,None)
+        self.err_count = 0
         #开始分析
         box_soup = BeautifulSoup(box_wra_html,self.features)
         labe_soup = box_soup.find('input', attrs={'checked': 'checked'}, class_="radio s").find_parent()
