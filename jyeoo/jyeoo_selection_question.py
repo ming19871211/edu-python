@@ -362,7 +362,7 @@ class JyeooSelectionQuestion:
             know_name = a_soup.get_text()
             know_id = '0'
             try:
-                know_id = re.findall(u"openPointCard\(\s*'[a-zA-Z\d]+?'\s*,\s*'([a-zA-Z\d]+?)'\s*\);\s*return\s*false;\s*",a_soup['onclick'])[0]
+                know_id = re.findall(u"openPointCard\(\s*'[a-zA-Z\d]+?'\s*,\s*'([\^~\!@\*&#%$\(！a-zA-Z\d]+?)'\s*\);\s*return\s*false;\s*",a_soup['onclick'])[0]
             except  Exception as e:
                 logger.exception(u'解析获取知识点ID失败,原始文本：%s，错误信息:%s',a_soup['onclick'],e.message)
             points.append({'code':know_id,'name':know_name})
