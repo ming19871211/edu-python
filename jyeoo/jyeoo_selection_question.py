@@ -469,8 +469,9 @@ class JyeooSelectionQuestion:
                 try:
                     #当题目达到计划数量时程序休息
                     index =  self.ques_plan.index(self.question_count )
+                    logger.info(u'Task sleep %s min', self.time_plan[index])
                     time.sleep(self.time_plan[index]*60)
-                    logger.info(u'Task sleep %s min',self.time_plan[index])
+                    logger.info(u'End task sleep')
                 except ValueError:
                     pass
 
