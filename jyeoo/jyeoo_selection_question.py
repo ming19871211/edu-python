@@ -480,6 +480,7 @@ class JyeooSelectionQuestion:
                     pass
 
                 if self.question_count >= self.question_Max_count:
+                    logger.info(u"Today's plan has been completed")
                     raise Exception(u'停止爬题，今日爬取数量：%d,已达到最大值：%d' % (self.question_count,self.question_Max_count))
 
             except Exception as e:
