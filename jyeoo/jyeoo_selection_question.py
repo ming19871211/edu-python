@@ -34,7 +34,7 @@ MAX_PAGE= getCFGInt('max_page',3)
 ERR_IDS = config.get(SELECTION_JYEOO,'err_ids').split(',')
 
 SQL_SUBJECT = 'select subject_code,subject_ename,subject_zname from t_subject'
-SQL_SUBJECT_DOWLOAD = 'SELECT subject_id FROM t_grade_ek_20180601 WHERE  status = 1 GROUP BY subject_id'
+SQL_SUBJECT_DOWLOAD = 'SELECT subject_id FROM t_grade_ek_20180602 WHERE  status = 1 GROUP BY subject_id'
 #当前日期
 CURR_DATE = datetime.date.today()
 def getUser(pg):
@@ -249,6 +249,8 @@ class JyeooSelectionQuestion:
         driver.get(URL.ROOT_URL)
         #登录
         self.login(driver)
+        #查询该账号是否已绑定版本
+        bind_grade =pg.getOne('select grade_id from t_grade_ek_20180602 WHERE subject_id=%s AND status = 1 AND user_name= %s',(course[0],self.user_name))
         try:
             driver.get(s_main_url)
             driver.implicitly_wait(10)
@@ -261,7 +263,7 @@ class JyeooSelectionQuestion:
                 ek_id = ek_soup['ek']
                 ek_name = ek_soup['nm']
                 # 判断此教材是否要下载
-                select_sql_e = 'select ek_id from t_grade_ek_20180601 WHERE ek_id=%s AND subject_id=%s AND status = 1'
+                select_sql_e = 'select ek_id from t_grade_ek_20180602 WHERE ek_id=%s AND subject_id=%s AND status = 1'
                 r = pg.getOne(select_sql_e,(ek_id,course[0]))
                 if not r : continue
                 # 点击选择教材版本
@@ -278,9 +280,18 @@ class JyeooSelectionQuestion:
                     grade_id = bk_soup['bk']
                     grade_name = bk_soup['nm']
                     # 判断此年级是否要下载
-                    select_sql_g = 'select grade_id from t_grade_ek_20180601 WHERE grade_id=%s AND ek_id=%s AND subject_id=%s AND status = 1'
-                    r = pg.getOne(select_sql_g, (grade_id,ek_id, course[0]))
-                    if not r: continue
+                    if bind_grade:
+                        if bind_grade[0] != grade_id: continue
+                    else:
+                        select_sql_g = 'select grade_id,user_name from t_grade_ek_20180602 WHERE grade_id=%s AND ek_id=%s AND subject_id=%s AND status = 1'
+                        r = pg.getOne(select_sql_g, (grade_id,ek_id, course[0]))
+                        if r and not  r[1]:
+                            #没有绑定进行绑定
+                            update_sql_g_u =  'UPDATE t_grade_ek_20180602 SET user_name=%s WHERE grade_id=%s AND ek_id=%s AND subject_id=%s '
+                            pg.execute(update_sql_g_u,(self.user_name,grade_id,ek_id,course[0]))
+                            pg.commit()
+                        else: continue
+
                     #点击选择年级
                     driver.implicitly_wait(10)
                     WebDriverWait(driver, 10).until(lambda x : x.find_element_by_xpath("//div[@class='tree-head']").is_displayed())
@@ -299,7 +310,7 @@ class JyeooSelectionQuestion:
                     tree_html = driver.find_element_by_xpath(tree_xpath).get_attribute('outerHTML') # innerHTML为内部数据
                     ul_soup = BeautifulSoup(tree_html,self.features).find(name='ul', attrs={'class': 'treeview'})
                     self.recurSelection(ul_soup,driver,course,pg,grade_id)
-                    update_sql_g = 'UPDATE t_grade_ek_20180601 SET status=2  WHERE grade_id=%s AND ek_id=%s AND subject_id=%s '
+                    update_sql_g = 'UPDATE t_grade_ek_20180602 SET status=2  WHERE grade_id=%s AND ek_id=%s AND subject_id=%s '
                     try:
                         pg.execute(update_sql_g,(grade_id,ek_id,course[0]))
                         pg.commit()
@@ -459,6 +470,7 @@ class JyeooSelectionQuestion:
                     #当题目达到计划数量时程序休息
                     index =  self.ques_plan.index(self.question_count )
                     time.sleep(self.time_plan[index]*60)
+                    logger.info(u'Task sleep %s min',self.time_plan[index])
                 except ValueError:
                     pass
 
