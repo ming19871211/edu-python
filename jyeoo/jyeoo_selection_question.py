@@ -79,6 +79,7 @@ def getUser(pg):
         params[row[0]] = row[1]
     user_dic['wait_min_time'] = int(params['wait_min_time'])
     user_dic['wait_max_time'] = int(params['wait_max_time'])
+    user_dic['session_valid_time'] = int(params['session_valid_time'])
     # 查询生成计划
     plan_sql = 'select ques_total,ques_count,ques_plan,time_plan,status from t_plan where user_name = %s and date >= %s'
     plan = pg.getOne(plan_sql,(user_dic['user_name'],curr_date))
@@ -137,13 +138,14 @@ class JyeooSelectionQuestion:
         self.browserType = user['browser']
         self.user_name = user['user_name']
         self.pass_word = user['pass_word']
-        # 当日最大爬题数量、已爬题数量、爬取计划、时间计划,题目最大、最小等待时间
+        # 当日最大爬题数量、已爬题数量、爬取计划、时间计划,题目最大、最小等待时间、session有效时间（h）
         self.question_Max_count = user['ques_total']
         self.question_count = user['ques_count']
         self.ques_plan = user['ques_plan']
         self.time_plan = user['time_plan']
         self.wait_min_time = user['wait_min_time']
         self.wait_max_time = user['wait_max_time']
+        self.session_valid_time = user['session_valid_time']
         #当日时间
         self.curr_date = CURR_DATE
 
@@ -197,9 +199,9 @@ class JyeooSelectionQuestion:
             vail_info = pickle.load(open("%s-vail.pkl" % self.user_name, "rb"))
         except Exception as e:
             pass
-        #4小时内 不用登陆
+        #session有效小时内 不用登陆
         if cookies and self.browserType == vail_info['browserType'] \
-                and (time.time() - vail_info['last_time']) < 60 * 60 * 4:
+                and (time.time() - vail_info['last_time']) < 60 * 60 * self.session_valid_time:
             for cookie in cookies:
                 driver.add_cookie(cookie)
         else:
