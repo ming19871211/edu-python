@@ -5,6 +5,19 @@ import re
 from bs4 import BeautifulSoup #lxml解析器
 import json
 import random
-pt1 = '1233241dasf'
-content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
+import os
+import datetime
+from utils import Utils
+from utils.SqlUtil import PostgreSql
+from ConfigParser import ConfigParser
+print Utils.getMacAddress()
+print Utils.getHostName()
+print Utils.getIpAddr(Utils.getHostName())
 
+config = ConfigParser()
+config.read('jyeoo.cfg')
+SELECTION_JYEOO = 'jyeoo'
+
+err_ids = config.get(SELECTION_JYEOO,'err_ids').split(',')
+
+print err_ids,type(err_ids)

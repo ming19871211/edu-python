@@ -6,6 +6,9 @@ import hashlib
 import os
 import sys
 import urlparse
+import uuid
+import socket
+
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
@@ -62,6 +65,19 @@ def getBigFileMD5(fileName):
             if not b : break
             hashmd5.update(b)
     return hashmd5.hexdigest()
+
+def getMacAddress():
+    '''获取本机MAC（物理）地址'''
+    mac=uuid.UUID(int = uuid.getnode()).hex[-12:]
+    return ":".join([mac[e:e+2] for e in range(0,11,2)])
+
+def getHostName():
+    '''获取本机电脑名'''
+    return socket.getfqdn(socket.gethostname(  ))
+
+def getIpAddr(hostname):
+    '''获取指定电脑名称的IP地址'''
+    return socket.gethostbyname(hostname)
 
 #全局参数
 webkit_cmd = 'webkit2png  -W  -o %s  -w 1  -g 0 0 -x %d %d %s'

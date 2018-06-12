@@ -5,9 +5,10 @@ import requests
 import HTMLParser
 import re
 import time
+import datetime
 import json
 from bs4 import BeautifulSoup #lxml解析器
-from utils import LoggerUtil
+from utils import LoggerUtil,Utils
 from utils.SqlUtil import PostgreSql,MongoDB
 from cfg import COLL,URL
 from selenium import webdriver
@@ -22,50 +23,141 @@ sys.setdefaultencoding('utf8')
 logger = LoggerUtil.getLogger(__name__)
 html_parser = HTMLParser.HTMLParser()
 logger = LoggerUtil.getLogger(__name__)
+
+#读取配置文件
 config = ConfigParser()
 config.read('jyeoo.cfg')
 SELECTION_JYEOO = 'jyeoo'
 def getCFGInt(params_name,default=None): return config.getint(SELECTION_JYEOO,params_name)if config.has_option(SELECTION_JYEOO,params_name) else default
-def getCFG(params_name,default=None): return config.get(SELECTION_JYEOO,params_name)if config.has_option(SELECTION_JYEOO,params_name) else default
-def getCFGBool(params_name,default=None): return config.getboolean(SELECTION_JYEOO,params_name)if config.has_option(SELECTION_JYEOO,params_name) else default
-
-MAX_PAGE= getCFGInt('max_page',3)
-#默认设置的最大一次爬取数量,VIP账号默认最大爬取量为200
-MAX_QUES_COUNT = getCFGInt('max_ques_count',200)
 NO_QUES_MESS=u'对不起，当前条件下没有试题，菁优网正在加速解析试题，敬请期待！'
-PROXY_HOST = getCFG('proxy_host','117.78.40.60')
-PROXY_PORT = getCFGInt('proxy_port',8888)
-IS_PROXY= getCFGBool('is_proxy',False) #不使用代理Fasle
-BROWSER_TYPE = getCFGInt('browser_type',1) #1-chrome
-#随机等待的最大最小时间
-WAIT_MAX_TIME = getCFGInt('wait_max_time',5)
-WAIT_MIN_TIME = getCFGInt('wait_min_time',1)
-
+MAX_PAGE= getCFGInt('max_page',3)
+ERR_IDS = config.get(SELECTION_JYEOO,'err_ids').split(',')
 
 SQL_SUBJECT = 'select subject_code,subject_ename,subject_zname from t_subject'
 SQL_SUBJECT_DOWLOAD = 'SELECT subject_id FROM t_grade_ek_20180601 WHERE  status = 1 GROUP BY subject_id'
+#当前日期
+CURR_DATE = datetime.date.today()
+def getUser(pg):
+    '''获取用户信息'''
+    user_dic = {}
+    mac_addr = Utils.getMacAddress()
+    user_sql = 'select user_name,pass_word,subject_code,browser,is_proxy,proxy_addr,proxy_port,mac_addr,other_info from t_user WHERE status = %s and mac_addr = %s'
+    user = pg.getOne(user_sql,(1,mac_addr))
+    if user:
+        user_dic['other_info'] = user[-1]
+    else:
+        sub_code = raw_input(u'No binding account found, please enter the subject code: ')
+        while True:
+            if re.findall('^[1-9][0-9]$',sub_code):
+                sub_code = int(sub_code)
+                user_sql = 'select user_name,pass_word,subject_code,browser,is_proxy,proxy_addr,proxy_port,mac_addr,other_info from t_user WHERE status = %s and subject_code = %s'
+                user = pg.getOne(user_sql,(0,sub_code))
+                other_info = {u'computerName':Utils.getHostName()}
+                user_update_sql = 'update t_user set status=%s, mac_addr=%s,other_info=%s where user_name = %s  '
+                try:
+                    pg.execute(user_update_sql,(1,mac_addr,json.dumps(other_info,ensure_ascii=False),user[0]))
+                    pg.commit()
+                    user_dic['other_info'] = other_info
+                except  Exception as e:
+                    pg.rollback()
+                    raise e
+                break
+            else:
+                sub_code = raw_input(u'The input discipline code format is incorrect, please re-enter the subject code: ')
+    user_dic['user_name']=user[0]
+    user_dic['pass_word'] = user[1]
+    user_dic['subject_code'] = user[2]
+    user_dic['browser'] = user[3]
+    user_dic['is_proxy'] = user[4]
+    user_dic['proxy_addr'] = user[5]
+    user_dic['proxy_port'] = user[6]
+    user_dic['mac_addr'] = mac_addr
+    curr_date = CURR_DATE
+    # 查询配置
+    params = {}
+    for row in pg.getAll('select name,value from t_param'):
+        params[row[0]] = row[1]
+    user_dic['wait_min_time'] = int(params['wait_min_time'])
+    user_dic['wait_max_time'] = int(params['wait_max_time'])
+    # 查询生成计划
+    plan_sql = 'select ques_total,ques_count,ques_plan,time_plan,status from t_plan where user_name = %s and date >= %s'
+    plan = pg.getOne(plan_sql,(user_dic['user_name'],curr_date))
+    if not plan:
+        #生成执行计划
+        user_dic['ques_total'],user_dic['ques_count'],user_dic['ques_plan'],user_dic['time_plan'] =generatePlan(params)
+        plan_insert_sql = 'insert into t_plan(user_name,ques_total,ques_count,ques_plan,time_plan,status) ' \
+                          'VALUES (%s,%s,%s,%s,%s,%s)'
+        try:
+            pg.execute(plan_insert_sql, (user_dic['user_name'], user_dic['ques_total'],user_dic['ques_count'],
+                                         json.dumps(user_dic['ques_plan']),json.dumps(user_dic['time_plan']),0))
+            pg.commit()
+        except  Exception as e:
+            pg.rollback()
+            raise e
+    elif plan[-1] == 1:
+        logger.info(u"Today's plan has been completed")
+        raise Exception(u"Today's plan has been completed")
+    else:
+        user_dic['ques_total'] = plan[0]
+        user_dic['ques_count'] = plan[1]
+        user_dic['ques_plan'] = plan[2]
+        user_dic['time_plan'] = plan[3]
+    return user_dic
 
-## 13875802165/123456ycl 不使用代理
-## 18163660636/abc123 使用了 117.78.40.60:8888
-ERR_IDS = ['510e061a-5315-4815-95ab-f6c258dfbcd2']
+def generatePlan(params):
+    # 已完成题目数，初始化为0
+    ques_count = 0
+    #获取题目总数
+    ques_total =  random.randint(int(params['ques_total_min']),int(params['ques_total_max']))
+    #题目计划
+    ques_plan = []
+    ques_min = int(params['ques_min'])
+    ques_max = int(params['ques_max'])
+    ques_alloc = 0
+    while (ques_total-ques_alloc) > ques_max:
+        ques_alloc += random.randint(ques_min,ques_max)
+        ques_plan.append(ques_alloc)
+    #时间计划
+    count = len(ques_plan)
+    wait_avg_time = int(params['wait_time_avg_total'])/count
+    time_plan = []
+    for i in range(0,count):
+        time_plan.append(wait_avg_time+random.randint(-20,20))
+    return (ques_total,ques_count,ques_plan,time_plan)
+
 class JyeooSelectionQuestion:
     '''根据章节爬取题目'''
-    def __init__(self,features='lxml',browserType=1,isPorxy=False,proxy_host=PROXY_HOST,proxy_port=PROXY_PORT,max_ques_count=MAX_QUES_COUNT):
+    def __init__(self,pg,features='lxml'):
         '''features BeautifulSoup 解析的方式:html.parser,lxml,lxml-xml,xml
             browserType:浏览器类型 1-chrome 2-Firefox
         '''
-        self.session = requests.Session()
+        user = getUser(pg)
         self.maxPage = 3
         self.features = features
-        self.browserType = browserType
-        if browserType == 2:
-            if isPorxy:
+        self.browserType = user['browser']
+        self.user_name = user['user_name']
+        self.pass_word = user['pass_word']
+        # 当日最大爬题数量、已爬题数量、爬取计划、时间计划,题目最大、最小等待时间
+        self.question_Max_count = user['ques_total']
+        self.question_count = user['ques_count']
+        self.ques_plan = user['ques_plan']
+        self.time_plan = user['time_plan']
+        self.wait_min_time = user['wait_min_time']
+        self.wait_max_time = user['wait_max_time']
+        #当日时间
+        self.curr_date = CURR_DATE
+
+        self.isPorxy = user['is_proxy']
+        proxy_host = user['proxy_addr']
+        proxy_port = user['proxy_port']
+        if self.browserType == 2:
+            if self.isPorxy:
                 fp = webdriver.FirefoxProfile()
                 # Direct = 0, Manual = 1, PAC = 2, AUTODETECT = 4, SYSTEM = 5
-                logger.info(u'Firefox 使用代理地址：%s:%d', proxy_host,proxy_host)
+                logger.info(u'Firefox 使用代理地址：%s:%d', proxy_host,proxy_port)
                 fp.set_preference("network.proxy.type", 1)
                 fp.set_preference("network.proxy.http", proxy_host)
-                fp.set_preference("network.proxy.http_port", int(proxy_host))
+                fp.set_preference("network.proxy.http_port", int(proxy_port))
                 fp.set_preference("general.useragent.override", "whater_useragent")
                 fp.update_preferences()
                 self.driver = webdriver.Firefox(firefox_profile=fp)
@@ -73,7 +165,7 @@ class JyeooSelectionQuestion:
                 logger.info(u'Firefox 不使用代理')
                 self.driver = webdriver.Firefox()
         else:
-            if isPorxy:
+            if self.isPorxy:
                 logger.info(u'chrome 使用代理地址：%s:%d',proxy_host,proxy_port)
                 chromeOptions = webdriver.ChromeOptions()
                 chromeOptions.add_argument("--proxy-server=http://%s:%d" %(proxy_host,proxy_port))
@@ -81,8 +173,6 @@ class JyeooSelectionQuestion:
             else:
                 logger.info(u'chrome 不使用代理')
                 self.driver = webdriver.Chrome()
-
-
         self.driver.maximize_window()
         self.insert_sql = u'INSERT INTO  t_ques_jyeoo_20180601(qid,answer,analyses,cate,cate_name,content,options,sections,points,subject,difficulty,dg,old_id) ' \
                           'VALUES (uuid_generate_v5(uuid_ns_url(), %s),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
@@ -92,33 +182,67 @@ class JyeooSelectionQuestion:
         self.update_sql_secs = u"UPDATE t_ques_jyeoo_20180601  SET  sections=%s  WHERE  qid=%s "
         self.cate = 1
         self.cate_name = '单选题'
-        self.question_count = 0
         self.err_count = 0
-        #最大爬题数量
-        self.question_Max_count = max_ques_count
+        self.__subject_code = user['subject_code']
+
+    def getSubjectCode(self):
+        return self.__subject_code
 
     def login(self,driver):
         '''用户登录'''
         cookies = None
-        last_time = 0.0
+        vail_info = None
         try:
-            cookies = pickle.load(open("cookies.pkl", "rb"))
-            last_time = pickle.load(open("time.pkl", "rb"))
+            cookies = pickle.load(open("%s-cookies.pkl" % self.user_name, "rb"))
+            vail_info = pickle.load(open("%s-vail.pkl" % self.user_name, "rb"))
         except Exception as e:
             pass
         #2小时内 不用登陆
-        if cookies and (time.time() - last_time) < 60 * 60 * 2:
+        if cookies and self.browserType == vail_info['browserType'] \
+                and (time.time() - vail_info['last_time']) < 60 * 60 * 2:
             for cookie in cookies:
                 driver.add_cookie(cookie)
         else:
-            isLog = raw_input(u'若用户已完成登录，请输入“1”：')
-            while isLog != '1':
-                isLog = raw_input(u'请再次，若用户已完成登录，请输入“1”：')
-            logger.info(u'用户确认已登录')
+            driver.implicitly_wait(10)
+            login_xpath = u"//div[@class='top']/div[@class='tr']/a[@href='/account/login']"
+            WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(login_xpath).is_displayed())
+            login_button = driver.find_element_by_xpath(login_xpath)
+            login_button.click()
+            #进入登录界面
+            pageWait = WebDriverWait(driver, 10)
+            pageWait.until(lambda x: x.find_element_by_xpath(u"//iframe[@id='mf']").is_displayed())
+            driver.switch_to_frame(frame_reference='mf')
+            wexin_xpath = u"//div[@id='divWeixinLogin']//div[@class='s-pc']"
+            WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(wexin_xpath).is_displayed())
+            wexin_button = driver.find_element_by_xpath(wexin_xpath)
+            wexin_button.click()
+            acc_input = driver.find_element_by_id('Email')
+            pwd_input = driver.find_element_by_id('Password')
+            acc_input.send_keys(self.user_name)
+            pwd_input.send_keys(self.pass_word)
+            while True:
+                try:
+                    if driver.find_element_by_xpath(u"//div[@class='user']"):
+                        logger.info(u'用户确认已登录')
+                        break
+                except Exception:
+                    acc_input = driver.find_element_by_id('Email')
+                    pwd_input = driver.find_element_by_id('Password')
+                    acc_input.clear()
+                    acc_input.send_keys(self.user_name)
+                    pwd_input.clear()
+                    pwd_input.send_keys(self.pass_word)
+                time.sleep(2)
+        self.saveCookies(driver)
+
+    def saveCookies(self,driver):
+        pickle.dump(driver.get_cookies(), open("%s-cookies.pkl" % self.user_name, "wb"))
+        vail_info = {'last_time':time.time(),'browserType':self.browserType}
+        pickle.dump(vail_info, open("%s-vail.pkl" % self.user_name, "wb"))
 
     def mainSelection(self,course,pg):
-        # mongo = MongoDB()
-        # coll = mongo.getCollection(COLL.SELECTION)
+        if course[0] != self.getSubjectCode():
+            raise Exception(u'Download Subject Non-account bound discipline')
         driver = self.driver
         s_main_url = URL.S_MAIN_URL % course[1]
         logger.info(u'科目：%s,url:%s',course[2],s_main_url)
@@ -182,10 +306,8 @@ class JyeooSelectionQuestion:
                     except Exception as e:
                         pg.rollback()
                         logger.exception(u'学科：%s，版本：%，年级：%s，下载完成标记异常', course[2], ek_name,grade_name)
-
         finally:
-            pickle.dump(driver.get_cookies(), open("cookies.pkl", "wb"))
-            pickle.dump(time.time(),open("time.pkl", "wb"))
+            self.saveCookies(driver)
 
     def recurSelection(self,ul_soup,driver,course,pg,grade_id,parent_Id=None,parent_name=None):
         '''按章节获取题目'''
@@ -246,6 +368,7 @@ class JyeooSelectionQuestion:
         #分析分页页面题目
         pt1_err_count = 0
         for li in div_soup.find_all(name='li',attrs={'class':'QUES_LI'}):
+            #分析具体的每一道题目
             try:
                 pt1 = unicode(li.find('div',attrs={'class':'pt1'}))
                 old_id = li.fieldset['id']
@@ -321,13 +444,24 @@ class JyeooSelectionQuestion:
                 params = (old_id,answer,analyses,self.cate,self.cate_name,content,options,
                           json.dumps(sections, ensure_ascii=False),points,subject,difficulty,dg,old_id)
                 try:
+                    #插入题目
                     pg.execute(self.insert_sql,params)
+                    self.question_count += 1
+                    # 更新执行计划 ques_count
+                    update_plan_sql = 'update t_plan set ques_count = %s WHERE user_name = %s and date >= %s'
+                    pg.execute(update_plan_sql,(self.question_count,self.user_name,self.curr_date))
                     pg.commit()
                 except  Exception as e2:
                     logger.error(u'插入菁优题目异常，异常信息%s,插入数据:%s',e2.message,json.dumps(params,ensure_ascii=False))
                     pg.rollback()
                     raise e2
-                self.question_count +=1
+                try:
+                    #当题目达到计划数量时程序休息
+                    index =  self.ques_plan.index(self.question_count )
+                    time.sleep(self.time_plan[index]*60)
+                except ValueError:
+                    pass
+
                 if self.question_count >= self.question_Max_count:
                     raise Exception(u'停止爬题，今日爬取数量：%d,已达到最大值：%d' % (self.question_count,self.question_Max_count))
 
@@ -366,7 +500,7 @@ class JyeooSelectionQuestion:
         '''获取题目答案与解析'''
         WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath("//div[@class='box-wrapper']").is_displayed())
         #随机等待1,5
-        time.sleep(random.randint(WAIT_MIN_TIME,WAIT_MAX_TIME))
+        time.sleep(random.randint(self.wait_min_time,self.wait_max_time))
         box_wra_elel = driver.find_element_by_xpath("//div[@class='box-wrapper']")
         # with open('text.txt','w') as f: f.write(box_wra_elel.get_attribute('outerHTML'))
         box_wra_html = box_wra_elel.get_attribute('outerHTML')
@@ -406,9 +540,11 @@ class JyeooSelectionQuestion:
         return (answer,analysis,points)
 
 if __name__ == '__main__':
-    selection = JyeooSelectionQuestion(browserType=BROWSER_TYPE,isPorxy=IS_PROXY)
-    pg = PostgreSql()
+    pg_host = config.get(SELECTION_JYEOO,'pg_host')
+    pg_port = config.getint(SELECTION_JYEOO,'pg_port')
+    pg = PostgreSql(host=pg_host,port=pg_port)
     try:
+        selection = JyeooSelectionQuestion(pg)
         #查询需要下载菁优题目的学科
         sd_list = []
         for s in pg.getAll(SQL_SUBJECT_DOWLOAD):
@@ -416,7 +552,7 @@ if __name__ == '__main__':
         #开始下载
         c_list = pg.getAll(SQL_SUBJECT)
         for course in c_list:
-            if course[0] in sd_list:
+            if course[0] == selection.getSubjectCode() and course[0] in sd_list:
                 selection.mainSelection(course,pg)
     finally:
         pg.close()

@@ -12,3 +12,5 @@
 *.pkl
 */*.pkl
 */venv
+build
+dist

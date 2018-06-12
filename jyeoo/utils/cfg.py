@@ -15,6 +15,7 @@ class DBCFG:
 class POSTGRE_CFG:
     '''postgreSql数据库配置'''
     host = "localhost"
+    #host="192.168.26.54"
     #host= "10.10.15.252"
     port = 5432
     user="root"

@@ -120,15 +120,15 @@ class Mysql(object):
 class PostgreSql(object):
     '''PostgreSql操作对象'''
 
-    def __init__(self):
-      self.__conn= self.__getConn()
+    def __init__(self,database=POSTGRE_CFG.db,user=POSTGRE_CFG.user,password=POSTGRE_CFG.passwd,host=POSTGRE_CFG.host,port=POSTGRE_CFG.port):
+      self.__conn= self.__getConn(database=database,user=user,password=password,host=host,port=port)
       self.__cur=self.__conn.cursor()
       self.__cur_dic = self.__conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
     @staticmethod
-    def __getConn():
+    def __getConn(database=POSTGRE_CFG.db,user=POSTGRE_CFG.user,password=POSTGRE_CFG.passwd,host=POSTGRE_CFG.host,port=POSTGRE_CFG.port):
         """ 静态方法，获取连接 """  
-        conn=psycopg2.connect(database=POSTGRE_CFG.db,user=POSTGRE_CFG.user,password=POSTGRE_CFG.passwd,host=POSTGRE_CFG.host,port=POSTGRE_CFG.port)
+        conn=psycopg2.connect(database=database,user=user,password=password,host=host,port=port)
         return conn
         
     def close(self):
@@ -154,7 +154,7 @@ class PostgreSql(object):
         cur.execute(sql,param)
         return cur.fetchall()
 
-    def getOne(self,sql,param=None):  
+    def getOne(self,sql,param=None,isdic=False):
         '''执行查询获取第一条查询结果'''
         self.__cur.execute(sql,param)
         return  self.__cur.fetchone()
