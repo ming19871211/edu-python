@@ -197,9 +197,9 @@ class JyeooSelectionQuestion:
             vail_info = pickle.load(open("%s-vail.pkl" % self.user_name, "rb"))
         except Exception as e:
             pass
-        #2小时内 不用登陆
+        #4小时内 不用登陆
         if cookies and self.browserType == vail_info['browserType'] \
-                and (time.time() - vail_info['last_time']) < 60 * 60 * 2:
+                and (time.time() - vail_info['last_time']) < 60 * 60 * 4:
             for cookie in cookies:
                 driver.add_cookie(cookie)
         else:
