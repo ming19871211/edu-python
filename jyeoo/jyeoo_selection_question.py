@@ -462,6 +462,8 @@ class JyeooSelectionQuestion:
                     self.question_count += 1
                     # 更新执行计划 ques_count
                     update_plan_sql = 'update t_plan set ques_count = %s WHERE user_name = %s and date >= %s'
+                    if self.question_count >= self.question_Max_count:
+                        update_plan_sql = 'update t_plan set ques_count = %s, status=1 WHERE user_name = %s and date >= %s'
                     pg.execute(update_plan_sql,(self.question_count,self.user_name,self.curr_date))
                     pg.commit()
                 except  Exception as e2:
