@@ -432,7 +432,7 @@ class JyeooSelectionQuestion:
                     if isNotExists:
                         secs.extend(sections)
                         try:
-                            pg.execute(self.update_sql_secs,json.dumps(secs,ensure_ascii=False),qid)
+                            pg.execute(self.update_sql_secs,(json.dumps(secs,ensure_ascii=False),qid))
                         except Exception as e1:
                             logger.error(u'更新题目章节异常，异常信息：%s，题目id：%s，章节信息：%s',
                                              e1.message,qid,json.dumps(secs,ensure_ascii=False))
