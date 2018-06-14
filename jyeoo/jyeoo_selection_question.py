@@ -487,8 +487,8 @@ class JyeooSelectionQuestion:
                 logger.exception(u'分析题目失败,题目原始网页：%s，错误信息：%s',unicode(li),e.message)
                 raise e
         # 下一页
-        self.next_page(driver,div_soup,sections)
-
+        totalQuesN = int(driver.find_element_by_xpath("//td[@id='TotalQuesN']/em").text)
+        if totalQuesN > 10:  self.next_page(driver,div_soup,sections)
 
     def next_page(self,driver,div_soup,sections):
         '''请求下一页'''
