@@ -385,6 +385,7 @@ class JyeooSelectionQuestion:
             try:
                 pt1 = unicode(li.find('div',attrs={'class':'pt1'}))
                 old_id = li.fieldset['id']
+                if old_id in ERR_IDS: continue
                 try:
                     content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
                 except IndexError as ie:
@@ -418,7 +419,6 @@ class JyeooSelectionQuestion:
                 dg = re.findall(u'<span>\s*难度：([\d\.]+?)\s*</span>',unicode(li.find('div',attrs={'class':'fieldtip-left'})))[0]
                 difficulty = 5 - int(float(dg) * 5)
                 # 判断题目是否成在，存在就不要在下载解析了，continue
-                if old_id in ERR_IDS: continue
                 r = pg.getOne(self.select_sql,(old_id,))
                 if r:
                     qid = r[0]
