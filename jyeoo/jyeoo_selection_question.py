@@ -29,10 +29,11 @@ config = ConfigParser()
 config.read('jyeoo.cfg')
 SELECTION_JYEOO = 'jyeoo'
 def getCFGInt(params_name,default=None): return config.getint(SELECTION_JYEOO,params_name)if config.has_option(SELECTION_JYEOO,params_name) else default
+def getCFG(params_name,default=None): return config.get(SELECTION_JYEOO,params_name)if config.has_option(SELECTION_JYEOO,params_name) else default
 NO_QUES_MESS=u'对不起，当前条件下没有试题，菁优网正在加速解析试题，敬请期待！'
 MAX_PAGE= getCFGInt('max_page',3)
 ERR_IDS = config.get(SELECTION_JYEOO,'err_ids').split(',')
-EMAIL_NAMES = config.get(SELECTION_JYEOO,'email_names').split(',') if config.has_option(SELECTION_JYEOO,'email_names') else None
+EMAIL_NAMES = getCFG('email_names')
 
 SQL_SUBJECT = 'select subject_code,subject_ename,subject_zname from t_subject'
 SQL_SUBJECT_DOWLOAD = 'SELECT subject_id FROM t_grade_ek_20180602 WHERE  status = 1 GROUP BY subject_id'
@@ -580,14 +581,22 @@ if __name__ == '__main__':
                 selection.mainSelection(course,pg)
     except Exception as e:
         #邮件报警
-        email = Utils.Email()
+        email_host = getCFG('email_host')
+        email_port = getCFG('email_port')
+        login_user =  getCFG('login_user')
+        login_passwd = getCFG('login_passwd')
+        if email_host and email_port and login_user and login_passwd:
+            email = Utils.Email(email_host,email_port,login_user,login_passwd)
+        else:
+            email = Utils.Email()
         email_names = EMAIL_NAMES if EMAIL_NAMES else [u'ming19871211@139.com']
         hostName = Utils.getHostName()
         senMsg = u'请查看机器，Mac：%s，主机名：%s，Ip地址：%s' % (Utils.getMacAddress(),hostName,Utils.getIpAddr(hostName))
-        if email.sendmail(email_names,senMsg):
+        try:
+            email.sendmail(email_names,senMsg)
             logger.info( u'程序出现异常的邮件,发送成功！哈哈')
-        else:
-            logger.info(u'程序出现异常的邮件,发送失败！')
+        except Exception as em:
+            logger.exception(u'程序出现异常的邮件,发送失败！异常信息：%s',e.message)
     finally:
         pg.close()
         if selection: selection.closeDriver()

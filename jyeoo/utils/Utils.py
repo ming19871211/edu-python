@@ -42,14 +42,10 @@ class Email():
                 code, text = smtp.connect(self.__email_host, self.__email_port)
             smtp.login(self.__login_user,self.__login_passwd)
             smtp.sendmail(self.__login_user, to_addrs, msg.as_string())
-            print code,text
-        except Exception as e:
-            print e.message,type(e)
-            return False
         finally:
-            smtp.quit()
-            smtp.close()
-        return True
+            if code and code == 220:
+                smtp.quit()
+                smtp.close()
 
 def dhash(imageFileName, hash_size = 8):
     '''得到图片的相识度MD5值'''
