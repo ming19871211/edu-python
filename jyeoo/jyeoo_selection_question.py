@@ -32,6 +32,7 @@ def getCFGInt(params_name,default=None): return config.getint(SELECTION_JYEOO,pa
 NO_QUES_MESS=u'对不起，当前条件下没有试题，菁优网正在加速解析试题，敬请期待！'
 MAX_PAGE= getCFGInt('max_page',3)
 ERR_IDS = config.get(SELECTION_JYEOO,'err_ids').split(',')
+EMAIL_NAMES = config.get(SELECTION_JYEOO,'email_names').split(',') if config.has_option(SELECTION_JYEOO,'email_names') else None
 
 SQL_SUBJECT = 'select subject_code,subject_ename,subject_zname from t_subject'
 SQL_SUBJECT_DOWLOAD = 'SELECT subject_id FROM t_grade_ek_20180602 WHERE  status = 1 GROUP BY subject_id'
@@ -186,6 +187,10 @@ class JyeooSelectionQuestion:
         self.cate_name = '单选题'
         self.err_count = 0
         self.__subject_code = user['subject_code']
+
+    def closeDriver(self):
+        self.driver.quit()
+        # self.driver.close()
 
     def getSubjectCode(self):
         return self.__subject_code
@@ -561,6 +566,7 @@ if __name__ == '__main__':
     pg_host = config.get(SELECTION_JYEOO,'pg_host')
     pg_port = config.getint(SELECTION_JYEOO,'pg_port')
     pg = PostgreSql(host=pg_host,port=pg_port)
+    selection = None
     try:
         selection = JyeooSelectionQuestion(pg)
         #查询需要下载菁优题目的学科
@@ -572,5 +578,16 @@ if __name__ == '__main__':
         for course in c_list:
             if course[0] == selection.getSubjectCode() and course[0] in sd_list:
                 selection.mainSelection(course,pg)
+    except Exception as e:
+        #邮件报警
+        email = Utils.Email()
+        email_names = EMAIL_NAMES if EMAIL_NAMES else [u'ming19871211@139.com']
+        hostName = Utils.getHostName()
+        senMsg = u'请查看机器，Mac：%s，主机名：%s，Ip地址：%s' % (Utils.getMacAddress(),hostName,Utils.getIpAddr(hostName))
+        if email.sendmail(email_names,senMsg):
+            logger.info( u'程序出现异常的邮件,发送成功！哈哈')
+        else:
+            logger.info(u'程序出现异常的邮件,发送失败！')
     finally:
         pg.close()
+        if selection: selection.closeDriver()
