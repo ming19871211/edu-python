@@ -429,7 +429,7 @@ class JyeooSelectionQuestion:
                 if r:
                     qid = r[0]
                     secs = r[1]
-                    #判断章节是否已添加到题目总
+                    #判断章节是否已添加到题目中
                     isNotExists = True
                     for sec in secs:
                         if sections[0]['code'] == sec['code']:
@@ -444,6 +444,12 @@ class JyeooSelectionQuestion:
                                              e1.message,qid,json.dumps(secs,ensure_ascii=False))
                             raise e1
                     continue
+
+                #查询线上题库题目是否存在，若存在直接添加到题目中
+                # TODO 还需实现 若线上库中有题目这不行要下载解析，直接添加到本库中
+
+
+                # TODO 待实现 end
                 # print json.dumps(sections, ensure_ascii=False)
                 #获取解析
                 analyze_xpath = u"//fieldset[@id='%s']/../div[@class='fieldtip']//i[@class='icon i-analyze']/.." % old_id
