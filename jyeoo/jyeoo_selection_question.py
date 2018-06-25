@@ -479,7 +479,7 @@ class JyeooSelectionQuestion:
                     # 更新执行计划 ques_count
                     update_plan_sql = 'update t_plan set ques_count = %s,update_time=CURRENT_TIMESTAMP WHERE user_name = %s and date >= %s'
                     if self.question_count >= self.question_Max_count:
-                        update_plan_sql = 'update t_plan set ques_count = %s,update_time=CURRENT_TIMESTAMP status=1 WHERE user_name = %s and date >= %s'
+                        update_plan_sql = 'update t_plan set ques_count = %s,update_time=CURRENT_TIMESTAMP, status=1 WHERE user_name = %s and date >= %s'
                     pg.execute(update_plan_sql,(self.question_count,self.user_name,self.curr_date))
                     pg.commit()
                 except  Exception as e2:
@@ -489,6 +489,8 @@ class JyeooSelectionQuestion:
                 try:
                     #当题目达到计划数量时程序休息
                     index =  self.ques_plan.index(self.question_count )
+                    logger.info(u'今日进度：%d/%d  -  学科代码：%d',
+                                self.question_count, self.question_Max_count, self.__subject_code)
                     logger.info(u'Task sleep %s min', self.time_plan[index])
                     time.sleep(self.time_plan[index]*60)
                     logger.info(u'End task sleep')
