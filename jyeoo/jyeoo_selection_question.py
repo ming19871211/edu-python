@@ -135,7 +135,7 @@ class JyeooSelectionQuestion:
             browserType:浏览器类型 1-chrome 2-Firefox
         '''
         user = getUser(pg)
-        self.maxPage = 3
+        self.maxPage = MAX_PAGE
         self.features = features
         self.browserType = user['browser']
         self.user_name = user['user_name']
@@ -188,7 +188,8 @@ class JyeooSelectionQuestion:
         self.cate_name = '单选题'
         self.err_count = 0
         self.__subject_code = user['subject_code']
-
+        logger.info(u'初始化参数,学科代码：%d，最大分页数量：%d，今日最大爬取数量：%d，今日已爬数量：%d',
+                    self.__subject_code,self.maxPage,self.question_Max_count,self.question_count)
     def closeDriver(self):
         self.driver.quit()
         # self.driver.close()
@@ -365,6 +366,8 @@ class JyeooSelectionQuestion:
                 a.click()
                 # 分析题干页面
                 self.parseQuestionPg(driver,sections,course,pg)
+                logger.info(u'今日进度：%d/%d  -  学科代码：%d',
+                            self.question_count, self.question_Max_count,self.__subject_code )
                 try:
                     pg.execute(self.insert_sql_section,(pk,title,status,grade_id))
                     pg.commit()
@@ -448,6 +451,7 @@ class JyeooSelectionQuestion:
                 #查询线上题库题目是否存在，若存在直接添加到题目中
                 # TODO 还需实现 若线上库中有题目这不行要下载解析，直接添加到本库中
 
+                # TODO 暂时不做，因为线上题库也不见的精准
 
                 # TODO 待实现 end
                 # print json.dumps(sections, ensure_ascii=False)
@@ -473,9 +477,9 @@ class JyeooSelectionQuestion:
                     pg.execute(self.insert_sql,params)
                     self.question_count += 1
                     # 更新执行计划 ques_count
-                    update_plan_sql = 'update t_plan set ques_count = %s WHERE user_name = %s and date >= %s'
+                    update_plan_sql = 'update t_plan set ques_count = %s,update_time=CURRENT_TIMESTAMP WHERE user_name = %s and date >= %s'
                     if self.question_count >= self.question_Max_count:
-                        update_plan_sql = 'update t_plan set ques_count = %s, status=1 WHERE user_name = %s and date >= %s'
+                        update_plan_sql = 'update t_plan set ques_count = %s,update_time=CURRENT_TIMESTAMP status=1 WHERE user_name = %s and date >= %s'
                     pg.execute(update_plan_sql,(self.question_count,self.user_name,self.curr_date))
                     pg.commit()
                 except  Exception as e2:
@@ -587,6 +591,8 @@ if __name__ == '__main__':
                 selection.mainSelection(course,pg)
     except Exception as e:
         #邮件报警
+        if not EMAIL_NAMES:
+            logger.exception(u'程序异常，没有收件人列表，所以不发邮件！')
         email_host = getCFG('email_host')
         email_port = getCFG('email_port')
         login_user =  getCFG('login_user')
@@ -595,9 +601,11 @@ if __name__ == '__main__':
             email = Utils.Email(email_host,email_port,login_user,login_passwd)
         else:
             email = Utils.Email()
-        email_names = EMAIL_NAMES if EMAIL_NAMES else [u'ming19871211@139.com']
+        email_names = EMAIL_NAMES
         hostName = Utils.getHostName()
-        senMsg = u'请查看机器，Mac：%s，主机名：%s，Ip地址：%s' % (Utils.getMacAddress(),hostName,Utils.getIpAddr(hostName))
+        senMsg = u'请查看机器，主机名：%s，Mac：%s，Ip地址：%s； \n' \
+                 u'错误信息：%s \n' \
+                 u'Exception：%s' % (hostName,Utils.getMacAddress(),Utils.getIpAddr(hostName),e.message,e)
         try:
             email.sendmail(email_names,senMsg)
             logger.info( u'程序出现异常的邮件,发送成功！哈哈')
