@@ -121,7 +121,12 @@ class PostgreSql(object):
     '''PostgreSql操作对象'''
 
     def __init__(self,database=POSTGRE_CFG.db,user=POSTGRE_CFG.user,password=POSTGRE_CFG.passwd,host=POSTGRE_CFG.host,port=POSTGRE_CFG.port):
-      self.__conn= self.__getConn(database=database,user=user,password=password,host=host,port=port)
+      self.__database = database
+      self.__user = user
+      self.__password = password
+      self.__host = host
+      self.__port = port
+      self.__conn= self.__getConn(database= self.__database,user=self.__user,password= self.__password,host=self.__host,port=self.__port)
       self.__cur=self.__conn.cursor()
       self.__cur_dic = self.__conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
@@ -130,7 +135,10 @@ class PostgreSql(object):
         """ 静态方法，获取连接 """  
         conn=psycopg2.connect(database=database,user=user,password=password,host=host,port=port)
         return conn
-        
+    def reConn(self):
+        '''重新获取数据库连接'''
+        self.__init__(database= self.__database,user=self.__user,password= self.__password,host=self.__host,port=self.__port)
+
     def close(self):
         """关闭当前连接"""
         self.__cur.close()

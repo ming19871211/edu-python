@@ -492,7 +492,9 @@ class JyeooSelectionQuestion:
                     logger.info(u'今日进度：%d/%d  -  学科代码：%d',
                                 self.question_count, self.question_Max_count, self.__subject_code)
                     logger.info(u'Task sleep %s min', self.time_plan[index])
+                    pg.close()
                     time.sleep(self.time_plan[index]*60)
+                    pg.reConn()
                     logger.info(u'End task sleep')
                 except ValueError:
                     pass
@@ -591,6 +593,7 @@ if __name__ == '__main__':
         for course in c_list:
             if course[0] == selection.getSubjectCode() and course[0] in sd_list:
                 selection.mainSelection(course,pg)
+        logger.info(u'本账号（%s）下、需要爬取版本的题目已全部完成！',selection.user_name)
     except Exception as e:
         #邮件报警
         if not EMAIL_NAMES:
