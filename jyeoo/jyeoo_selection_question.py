@@ -378,7 +378,7 @@ class JyeooSelectionQuestion:
     def parseQuestionPg(self,driver,sections,course,pg):
         '''分析分页题目'''
         driver.implicitly_wait(10)
-        time.sleep(3)
+        time.sleep(random.randint(10, 20))
         #获取题目信息页面
         pageArea_html = driver.find_element_by_id('pageArea').get_attribute('outerHTML')
         div_soup = BeautifulSoup(pageArea_html, self.features)
