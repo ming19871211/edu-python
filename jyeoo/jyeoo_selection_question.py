@@ -396,7 +396,7 @@ class JyeooSelectionQuestion:
                 old_id = li.fieldset['id']
                 if old_id in ERR_IDS: continue
                 try:
-                    content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
+                    content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+(class=[\'"]ques-source[\'"]\s+)?href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
                 except IndexError as ie:
                     pt1_err_count +=1
                     logger.warn(u'匹配题干异常，源码为:%s',pt1)
@@ -404,7 +404,7 @@ class JyeooSelectionQuestion:
                         continue
                     else:
                         raise ie
-                # content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+href=.+?>)?(（.+?）)?(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
+                # content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+(class=[\'"]ques-source[\'"]\s+)?href=.+?>)?(（.+?）)?(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
                 content = u'%s%s'%(content_arr[0],content_arr[-1])
                 # print content
                 # try:
