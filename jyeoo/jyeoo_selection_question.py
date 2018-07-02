@@ -39,12 +39,18 @@ SQL_SUBJECT = 'select subject_code,subject_ename,subject_zname from t_subject'
 SQL_SUBJECT_DOWLOAD = 'SELECT subject_id FROM t_grade_ek_20180602 WHERE  status = 1 GROUP BY subject_id'
 #当前日期
 CURR_DATE = datetime.date.today()
+
+'''爬题完成后抛出异常'''
+class CompleteException(Exception): pass
+
+
 def getUser(pg):
     '''获取用户信息'''
     user_dic = {}
     mac_addr = Utils.getMacAddress()
-    user_sql = 'select user_name,pass_word,subject_code,browser,is_proxy,proxy_addr,proxy_port,mac_addr,other_info from t_user WHERE status = %s and mac_addr = %s'
-    user = pg.getOne(user_sql,(1,mac_addr))
+    host_name = Utils.getHostName()
+    user_sql = 'select user_name,pass_word,subject_code,browser,is_proxy,proxy_addr,proxy_port,host_name,other_info from t_user WHERE status = %s and host_name = %s'
+    user = pg.getOne(user_sql,(1,host_name))
     if user:
         user_dic['other_info'] = user[-1]
     else:
@@ -52,12 +58,14 @@ def getUser(pg):
         while True:
             if re.findall('^[1-9][0-9]$',sub_code):
                 sub_code = int(sub_code)
-                user_sql = 'select user_name,pass_word,subject_code,browser,is_proxy,proxy_addr,proxy_port,mac_addr,other_info from t_user WHERE status = %s and subject_code = %s'
+                user_sql = 'select user_name,pass_word,subject_code,browser,is_proxy,proxy_addr,proxy_port,host_name,other_info from t_user WHERE status = %s and subject_code = %s'
                 user = pg.getOne(user_sql,(0,sub_code))
-                other_info = {u'computerName':Utils.getHostName()}
-                user_update_sql = 'update t_user set status=%s, mac_addr=%s,other_info=%s where user_name = %s  '
+                if not user:
+                    raise Exception(u'学科:%d，没有可用账号！' % sub_code)
+                other_info = {u'computerName':host_name,u'mac_addr':mac_addr}
+                user_update_sql = 'update t_user set status=%s, host_name=%s,other_info=%s where user_name = %s  '
                 try:
-                    pg.execute(user_update_sql,(1,mac_addr,json.dumps(other_info,ensure_ascii=False),user[0]))
+                    pg.execute(user_update_sql,(1,host_name,json.dumps(other_info,ensure_ascii=False),user[0]))
                     pg.commit()
                     user_dic['other_info'] = other_info
                 except  Exception as e:
@@ -73,7 +81,7 @@ def getUser(pg):
     user_dic['is_proxy'] = user[4]
     user_dic['proxy_addr'] = user[5]
     user_dic['proxy_port'] = user[6]
-    user_dic['mac_addr'] = mac_addr
+    user_dic['host_name'] = host_name
     curr_date = CURR_DATE
     # 查询配置
     params = {}
@@ -299,6 +307,7 @@ class JyeooSelectionQuestion:
                             update_sql_g_u =  'UPDATE t_grade_ek_20180602 SET user_name=%s WHERE grade_id=%s AND ek_id=%s AND subject_id=%s '
                             pg.execute(update_sql_g_u,(self.user_name,grade_id,ek_id,course[0]))
                             pg.commit()
+                            bind_grade = [grade_id]
                         else: continue
 
                     #点击选择年级
@@ -326,6 +335,7 @@ class JyeooSelectionQuestion:
                     except Exception as e:
                         pg.rollback()
                         logger.exception(u'学科：%s，版本：%，年级：%s，下载完成标记异常', course[2], ek_name,grade_name)
+                    bind_grade = None
         finally:
             self.saveCookies(driver)
 
@@ -501,7 +511,7 @@ class JyeooSelectionQuestion:
 
                 if self.question_count >= self.question_Max_count:
                     logger.info(u"Today's plan has been completed")
-                    raise Exception(u'停止爬题，今日爬取数量：%d,已达到最大值：%d' % (self.question_count,self.question_Max_count))
+                    raise CompleteException(u'停止爬题，今日爬取数量：%d,已达到最大值：%d' % (self.question_count,self.question_Max_count))
 
             except Exception as e:
                 logger.exception(u'分析题目失败,题目原始网页：%s，错误信息：%s',unicode(li),e.message)
@@ -608,7 +618,11 @@ if __name__ == '__main__':
             email = Utils.Email()
         email_names = EMAIL_NAMES
         hostName = Utils.getHostName()
-        senMsg = u'请查看机器，主机名：%s，Mac：%s，Ip地址：%s； \n' \
+        if isinstance(e,CompleteException):
+            senMsg = u'恭喜今日爬取已完成！主机名：%s，Mac：%s，Ip地址：%s；\n' \
+                     u'详细信息：%s'  % (hostName,Utils.getMacAddress(),Utils.getIpAddr(hostName),e.message)
+        else:
+            senMsg = u'请查看机器，主机名：%s，Mac：%s，Ip地址：%s； \n' \
                  u'错误信息：%s \n' \
                  u'Exception：%s' % (hostName,Utils.getMacAddress(),Utils.getIpAddr(hostName),e.message,e)
         try:
