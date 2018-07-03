@@ -409,7 +409,7 @@ class JyeooSelectionQuestion:
                     content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+(class=[\'"]ques-source[\'"]\s+)?href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
                 except IndexError as ie:
                     pt1_err_count +=1
-                    logger.warn(u'匹配题干异常，源码为:%s',pt1)
+                    logger.warn(u'匹配题干异常，id为:%s，源码为:%s',old_id,pt1)
                     if pt1_err_count <=3 :
                         continue
                     else:
