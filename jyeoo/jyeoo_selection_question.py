@@ -286,7 +286,7 @@ class JyeooSelectionQuestion:
                 # 点击选择教材版本
                 driver.implicitly_wait(10)
                 WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath("//div[@class='tree-head']").is_displayed())
-                time.sleep(1)
+                time.sleep(random.randint(5,10))
                 th_ele = driver.find_element_by_xpath("//div[@class='tree-head']")
                 webdriver.ActionChains(driver).move_to_element(th_ele).perform()
                 th_ele.click()
@@ -313,7 +313,7 @@ class JyeooSelectionQuestion:
                     #点击选择年级
                     driver.implicitly_wait(10)
                     WebDriverWait(driver, 10).until(lambda x : x.find_element_by_xpath("//div[@class='tree-head']").is_displayed())
-                    time.sleep(1)
+                    time.sleep(random.randint(5, 10))
                     th_ele = driver.find_element_by_xpath("//div[@class='tree-head']")
                     webdriver.ActionChains(driver).move_to_element(th_ele).perform()
                     th_ele.click()
