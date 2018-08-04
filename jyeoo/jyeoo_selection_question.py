@@ -220,11 +220,18 @@ class JyeooSelectionQuestion:
             for cookie in cookies:
                 driver.add_cookie(cookie)
         else:
-            driver.implicitly_wait(10)
-            login_xpath = u"//div[@class='top']/div[@class='tr']/a[@href='/account/login']"
-            WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(login_xpath).is_displayed())
-            login_button = driver.find_element_by_xpath(login_xpath)
-            login_button.click()
+            login_click_count = 0
+            try:
+                login_click_count += 1
+                driver.implicitly_wait(10)
+                login_xpath = u"//div[@class='top']/div[@class='tr']/a[@href='/account/login']"
+                WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(login_xpath).is_displayed())
+                login_button = driver.find_element_by_xpath(login_xpath)
+                login_button.click()
+            except  Exception as e:
+                if login_click_count > 3:
+                    logger.exception(u'登录异常，获取登录按钮点击异常，异常次数：%d',login_click_count)
+                    raise e
             #进入登录界面
             pageWait = WebDriverWait(driver, 10)
             pageWait.until(lambda x: x.find_element_by_xpath(u"//iframe[@id='mf']").is_displayed())
@@ -406,7 +413,7 @@ class JyeooSelectionQuestion:
                 old_id = li.fieldset['id']
                 if old_id in ERR_IDS: continue
                 try:
-                    content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+(class=[\'"]ques-source[\'"]\s+)?href=.+?>)?(（.+?）)(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
+                    content_arr = re.findall(u'^<div\s+class=[\'"]pt1[\'"]>\s*<!--B\d+-->\s*(.*?)<span\s+class=[\'"]qseq[\'"]>[1-9]\d*．</span>(<a\s+(class=[\'"]ques-source[\'"]\s+)?href=.+?>)?(（.+?）)?(</a>)?(.+?)<!--E\d+-->\s*</div>$',pt1)[0]
                 except IndexError as ie:
                     pt1_err_count +=1
                     logger.warn(u'匹配题干异常，id为:%s，源码为:%s',old_id,pt1)
