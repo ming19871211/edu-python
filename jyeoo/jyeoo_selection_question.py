@@ -221,17 +221,19 @@ class JyeooSelectionQuestion:
                 driver.add_cookie(cookie)
         else:
             login_click_count = 0
-            try:
-                login_click_count += 1
-                driver.implicitly_wait(10)
-                login_xpath = u"//div[@class='top']/div[@class='tr']/a[@href='/account/login']"
-                WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(login_xpath).is_displayed())
-                login_button = driver.find_element_by_xpath(login_xpath)
-                login_button.click()
-            except  Exception as e:
-                if login_click_count > 3:
-                    logger.exception(u'登录异常，获取登录按钮点击异常，异常次数：%d',login_click_count)
-                    raise e
+            while True:
+                try:
+                    login_click_count += 1
+                    driver.implicitly_wait(10)
+                    login_xpath = u"//div[@class='top']/div[@class='tr']/a[@href='/account/login']"
+                    WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(login_xpath).is_displayed())
+                    login_button = driver.find_element_by_xpath(login_xpath)
+                    login_button.click()
+                    break
+                except  Exception as e:
+                    if login_click_count > 3:
+                        logger.exception(u'登录异常，获取登录按钮点击异常，异常次数：%d',login_click_count)
+                        raise e
             #进入登录界面
             pageWait = WebDriverWait(driver, 10)
             pageWait.until(lambda x: x.find_element_by_xpath(u"//iframe[@id='mf']").is_displayed())
