@@ -619,31 +619,31 @@ if __name__ == '__main__':
                 selection.mainSelection(course,pg)
         logger.info(u'本账号（%s）下、需要爬取版本的题目已全部完成！',selection.user_name)
     except Exception as e:
-        #邮件报警
-        if not EMAIL_NAMES:
+        if EMAIL_NAMES:
+            email_host = getCFG('email_host')
+            email_port = getCFG('email_port')
+            login_user =  getCFG('login_user')
+            login_passwd = getCFG('login_passwd')
+            if email_host and email_port and login_user and login_passwd:
+                email = Utils.Email(email_host,email_port,login_user,login_passwd)
+            else:
+                email = Utils.Email()
+            email_names = EMAIL_NAMES
+            hostName = Utils.getHostName()
+            if isinstance(e,CompleteException):
+                senMsg = u'恭喜今日爬取已完成！主机名：%s，Mac：%s，Ip地址：%s；\n' \
+                         u'详细信息：%s'  % (hostName,Utils.getMacAddress(),Utils.getIpAddr(hostName),e.message)
+            else:
+                senMsg = u'请查看机器，主机名：%s，Mac：%s，Ip地址：%s； \n' \
+                     u'错误信息：%s \n' \
+                     u'Exception：%s' % (hostName,Utils.getMacAddress(),Utils.getIpAddr(hostName),e.message,e)
+            try:
+                email.sendmail(email_names,senMsg)
+                logger.info( u'程序出现异常的邮件,发送成功！哈哈')
+            except Exception as em:
+                logger.exception(u'程序出现异常的邮件,发送失败！异常信息：%s',e.message)
+        else:
             logger.exception(u'程序异常，没有收件人列表，所以不发邮件！')
-        email_host = getCFG('email_host')
-        email_port = getCFG('email_port')
-        login_user =  getCFG('login_user')
-        login_passwd = getCFG('login_passwd')
-        if email_host and email_port and login_user and login_passwd:
-            email = Utils.Email(email_host,email_port,login_user,login_passwd)
-        else:
-            email = Utils.Email()
-        email_names = EMAIL_NAMES
-        hostName = Utils.getHostName()
-        if isinstance(e,CompleteException):
-            senMsg = u'恭喜今日爬取已完成！主机名：%s，Mac：%s，Ip地址：%s；\n' \
-                     u'详细信息：%s'  % (hostName,Utils.getMacAddress(),Utils.getIpAddr(hostName),e.message)
-        else:
-            senMsg = u'请查看机器，主机名：%s，Mac：%s，Ip地址：%s； \n' \
-                 u'错误信息：%s \n' \
-                 u'Exception：%s' % (hostName,Utils.getMacAddress(),Utils.getIpAddr(hostName),e.message,e)
-        try:
-            email.sendmail(email_names,senMsg)
-            logger.info( u'程序出现异常的邮件,发送成功！哈哈')
-        except Exception as em:
-            logger.exception(u'程序出现异常的邮件,发送失败！异常信息：%s',e.message)
     finally:
         pg.close()
         if selection: selection.closeDriver()
