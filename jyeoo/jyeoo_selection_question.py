@@ -49,7 +49,7 @@ def getUser(pg):
     user_dic = {}
     mac_addr = Utils.getMacAddress()
     host_name = Utils.getHostName()
-    user_sql = 'select user_name,pass_word,subject_code,browser,is_proxy,proxy_addr,proxy_port,host_name,other_info from t_user WHERE status = %s and host_name = %s'
+    user_sql = 'select user_name,pass_word,subject_code,browser,is_proxy,proxy_addr,proxy_port,host_name,expiration,detail,other_info from t_user WHERE status = %s and host_name = %s'
     user = pg.getOne(user_sql,(1,host_name))
     if user:
         user_dic['other_info'] = user[-1]
@@ -58,7 +58,7 @@ def getUser(pg):
         while True:
             if re.findall('^[1-9][0-9]$',sub_code):
                 sub_code = int(sub_code)
-                user_sql = 'select user_name,pass_word,subject_code,browser,is_proxy,proxy_addr,proxy_port,host_name,other_info from t_user WHERE status = %s and subject_code = %s'
+                user_sql = 'select user_name,pass_word,subject_code,browser,is_proxy,proxy_addr,proxy_port,host_name,expiration,detail,other_info from t_user WHERE status = %s and subject_code = %s'
                 user = pg.getOne(user_sql,(0,sub_code))
                 if not user:
                     raise Exception(u'学科:%d，没有可用账号！' % sub_code)
@@ -82,7 +82,12 @@ def getUser(pg):
     user_dic['proxy_addr'] = user[5]
     user_dic['proxy_port'] = user[6]
     user_dic['host_name'] = host_name
+    user_dic['detail'] = user[-2]
+    user_dic['expiration'] = user[-3]
     curr_date = CURR_DATE
+    if curr_date > user_dic['expiration']:
+        logger.info(u"VIP account(%s) has expired. detail:%s",user_dic['user_name'],user_dic['detail'])
+        raise Exception(u"VIP account(%s) has expired. detail:%s" % (user_dic['user_name'],user_dic['detail']))
     # 查询配置
     params = {}
     for row in pg.getAll('select name,value from t_param'):
@@ -271,7 +276,7 @@ class JyeooSelectionQuestion:
             raise Exception(u'Download Subject Non-account bound discipline')
         driver = self.driver
         s_main_url = URL.S_MAIN_URL % course[1]
-        logger.info(u'科目：%s,url:%s',course[2],s_main_url)
+        logger.info(u'科目：%s,url:%s,账号：%s',course[2],s_main_url,self.user_name)
         driver.get(URL.ROOT_URL)
         #登录
         self.login(driver)

@@ -21,3 +21,10 @@ SELECTION_JYEOO = 'jyeoo'
 err_ids = config.get(SELECTION_JYEOO,'err_ids').split(',')
 
 print err_ids,type(err_ids)
+
+a =  datetime.date.today()
+b = datetime.date(2018,7,7)
+
+print a,b,a==b,a<=b,b>a,a>b
+
+
