@@ -234,14 +234,14 @@ class JyeooSelectionQuestion:
                     WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(login_xpath).is_displayed())
                     login_button = driver.find_element_by_xpath(login_xpath)
                     login_button.click()
+                    pageWait = WebDriverWait(driver, 10)
+                    pageWait.until(lambda x: x.find_element_by_xpath(u"//iframe[@id='mf']").is_displayed())
                     break
                 except  Exception as e:
                     if login_click_count > 3:
                         logger.exception(u'登录异常，获取登录按钮点击异常，异常次数：%d',login_click_count)
                         raise e
             #进入登录界面
-            pageWait = WebDriverWait(driver, 10)
-            pageWait.until(lambda x: x.find_element_by_xpath(u"//iframe[@id='mf']").is_displayed())
             driver.switch_to_frame(frame_reference='mf')
             wexin_xpath = u"//div[@id='divWeixinLogin']//div[@class='s-pc']"
             WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(wexin_xpath).is_displayed())
