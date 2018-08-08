@@ -10,7 +10,6 @@ import json
 from bs4 import BeautifulSoup #lxml解析器
 from utils import LoggerUtil,Utils
 from utils.SqlUtil import PostgreSql,MongoDB
-from cfg import COLL,URL
 from selenium import webdriver
 from selenium.webdriver.remote.command import Command
 from selenium.webdriver.support.ui import WebDriverWait
@@ -95,6 +94,9 @@ def getUser(pg):
     user_dic['wait_min_time'] = int(params['wait_min_time'])
     user_dic['wait_max_time'] = int(params['wait_max_time'])
     user_dic['session_valid_time'] = int(params['session_valid_time'])
+    if params['err_ids']:
+        for err_id in params['err_ids'].split(','):
+            if err_id not in ERR_IDS: ERR_IDS.append(err_id)
     # 查询生成计划
     plan_sql = 'select ques_total,ques_count,ques_plan,time_plan,status from t_plan where user_name = %s and date >= %s'
     plan = pg.getOne(plan_sql,(user_dic['user_name'],curr_date))
