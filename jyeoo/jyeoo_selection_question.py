@@ -10,6 +10,7 @@ import json
 from bs4 import BeautifulSoup #lxml解析器
 from utils import LoggerUtil,Utils
 from utils.SqlUtil import PostgreSql,MongoDB
+from cfg import COLL,URL
 from selenium import webdriver
 from selenium.webdriver.remote.command import Command
 from selenium.webdriver.support.ui import WebDriverWait
