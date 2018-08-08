@@ -473,7 +473,7 @@ class JyeooSelectionQuestion:
                     continue
 
                 #查询线上题库题目是否存在，若存在直接添加到题目中
-                # TODO 还需实现 若线上库中有题目这不行要下载解析，直接添加到本库中
+                # TODO 还需实现 若线上库中有题目则不需要下载解析，直接添加到本库中
 
                 # TODO 暂时不做，因为线上题库也不见的精准
 
@@ -579,8 +579,13 @@ class JyeooSelectionQuestion:
         self.err_count = 0
         #开始分析
         box_soup = BeautifulSoup(box_wra_html,self.features)
-        labe_soup = box_soup.find('input', attrs={'checked': 'checked'}, class_="radio s").find_parent()
-        answer = re.findall(u'^([A-Z])．.*$',labe_soup.get_text())
+        answer = None
+        try:
+            labe_soup = box_soup.find('input', attrs={'checked': 'checked'}, class_="radio s").find_parent()
+            answer = re.findall(u'^([A-Z])．.*$',labe_soup.get_text())
+        except Exception as ea:
+            logger.exception(u'解析单选题答案异常，答案解析源码是:%s',box_wra_html)
+            raise ea
         if not answer:
             logger.error(u'获取解析答案异常,解析文本值:%s',labe_soup.get_text())
             raise Exception(u'获取解析答案异常,解析文本值:%s',labe_soup.get_text())
