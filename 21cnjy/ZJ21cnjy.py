@@ -281,7 +281,3 @@ class ZJ21cnjy:
                 raise e
         else:
             raise Exception(u'题型暂时无法解析')
-
-if __name__ == '__main__':
-    zj21cnjy = ZJ21cnjy()
-    zj21cnjy.downloadQuestions(1)
