@@ -7,6 +7,7 @@ import uuid
 import time
 import os
 import urlparse
+import threading
 from config import URL,SQL,PATH,QUES_QUERY_TYPE
 from utils.SqlUtil import PostgreSql
 from utils import LoggerUtil,Utils
@@ -347,7 +348,24 @@ class ZJ21cnjy:
         if not extension: extension = '.png'
         url_path = Utils.getStrMD5(url)+extension
         return os.path.join(root_path, url_path)
+    def scarpyQuesImage(self,image_download_root=PATH.IMAGE_DOWNLOAD_ROOT,tmp_suffix=PATH.TMP_SUFFIX):
+        '''启动爬虫进行爬取'''
+        logger.info(u'启动爬取图片流程完成！')
+        for i in range(0, 3):
+            logger.info(u'开启主jyeoo_image爬虫第%d次' % (i + 1))
+            os.system('scrapy crawl zj21cnjy_image')
+            for t in threading.enumerate():
+                if t is threading.currentThread():
+                    continue
+                t.join()
+        # 获取未下载的图片数量
+        tmp_count = 0
+        for parent, dir_names, file_names in os.walk(image_download_root):
+            for file_name in file_names:
+                if file_name.endswith(tmp_suffix): tmp_count += 1
+        if tmp_count > 0:
+            logger.error(u'爬取图片流程，未完成，临时图片数量还剩:%d', tmp_count)
+            raise Exception(u'爬取图片流程，未完成，临时图片数量还剩:%d', tmp_count)
+        logger.info(u'爬取图片流程完成！')
 
-if __name__ == '__main__':
-    zj21cnjy = ZJ21cnjy()
 
