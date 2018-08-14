@@ -366,8 +366,8 @@ class JyeooSelectionQuestion:
             if child_ul_soup:
                 if 'expandable' in li_soup['class']:
                     WebDriverWait(driver, 20).until(lambda x: x.find_element_by_xpath(
-                        u"//li/a[@pk='%s'][@title='%s']/../div" % (pk, title)).is_displayed())
-                    div_ele = driver.find_element_by_xpath(u"//li/a[@pk='%s'][@title='%s']/../div" % (pk, title))
+                        u'//li/a[@pk="%s"][@title="%s"]/../div' % (pk, title)).is_displayed())
+                    div_ele = driver.find_element_by_xpath(u'//li/a[@pk="%s"][@title="%s"]/../div' % (pk, title))
                     if self.browserType == 2:
                         webdriver.ActionChains(driver).move_to_element(div_ele)
                     else:
@@ -375,7 +375,7 @@ class JyeooSelectionQuestion:
                     div_ele.click()
                 self.recurSelection(child_ul_soup,driver,course,pg,grade_id,pk_arr[-2],title)
             else:
-                a = driver.find_element_by_xpath(u"//li/a[@pk='%s'][@title='%s']" % (pk,title))
+                a = driver.find_element_by_xpath(u'//li/a[@pk="%s"][@title="%s"]' % (pk,title))
                 section_id = pk_arr[-2]
                 section_name = title
                 if pk_arr[-1]:
@@ -627,6 +627,7 @@ if __name__ == '__main__':
                 selection.mainSelection(course,pg)
         logger.info(u'本账号（%s）下、需要爬取版本的题目已全部完成！',selection.user_name)
     except Exception as e:
+        logger.exception(u'爬取题目出现异常，异常信息：%s',e.message)
         if EMAIL_NAMES:
             email_host = getCFG('email_host')
             email_port = getCFG('email_port')
@@ -651,7 +652,7 @@ if __name__ == '__main__':
             except Exception as em:
                 logger.exception(u'程序出现异常的邮件,发送失败！异常信息：%s',e.message)
         else:
-            logger.exception(u'程序异常，没有收件人列表，所以不发邮件！')
+            logger.error(u'程序异常，没有收件人列表，所以不发邮件！')
     finally:
         pg.close()
         if selection: selection.closeDriver()
