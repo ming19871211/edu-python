@@ -5,7 +5,9 @@ import requests
 import re
 import uuid
 import time
-from config import URL,SQL,QUES_QUERY_TYPE
+import os
+import urlparse
+from config import URL,SQL,PATH,QUES_QUERY_TYPE
 from utils.SqlUtil import PostgreSql
 from utils import LoggerUtil,Utils
 import sys
@@ -281,3 +283,71 @@ class ZJ21cnjy:
                 raise e
         else:
             raise Exception(u'题型暂时无法解析')
+
+    def extractQuesImage(self,rows = 1000,select_batch_ques=SQL.SELECT_BATCH_QUES,
+                         insert_image_url=SQL.INSERT_IMAGE_URL,update_status=SQL.UPDATE_STATUS):
+        '''分析提取题目图片'''
+        logger.info(u'开始分析提取题目图片')
+        seq = 0
+        try:
+            pg = PostgreSql()
+            flag = True
+            count = 0
+            while flag:
+                try:
+                    flag = False
+                    insert_params = []
+                    update_params = []
+                    for row in pg.getAll(select_batch_ques, (0, seq, rows)):
+                        flag = True
+                        qid = row[0]
+                        old_id = row[1]
+                        seq = row[2]
+                        try:
+                            urls = [row[3],row[4]]
+                            for col in row[5:]:
+                                if col is None: continue
+                                urls.extend(self.__get21cnjyImg(col))
+                            # 生成临时的图片文件
+                            self.__generateTmpImage(urls)
+                            # 插入数据到img表 存在图片状态为0，不存在图片状态为2
+                            insert_params.append((seq,qid, Utils.toJson(urls), 0 if urls else 2))
+                            # 更新21cnjy主表的数据状态 存在图片状态修改为1，不存在图片状态为2
+                            update_params.append((1 if urls else 2, qid))
+                        except Exception as ex:
+                            logger.exception(u"处理qi=%s，old_id=%s，创建题目的图片发生异常,异常信息：%s" % (qid, old_id, ex.message))
+                    if update_params: pg.batchExecute(update_status, update_params)
+                    if insert_params: pg.batchExecute(insert_image_url, insert_params)
+                    pg.commit()
+                    count += len(update_params)
+                    logger.info(u'已成功处理题目数量:%d' % count)
+                except Exception as e:
+                    pg.rollback()
+                    logger.exception("批量处理-异常信息:%s" % (e.message))
+        finally:
+            pg.close()
+
+    def __get21cnjyImg(self, str):
+        '''获取图片'''
+        return re.findall(u'[\"|\'](https?://[a-z0-9A-z][a-z0-9A-z\.]+[a-z0-9A-z]/.*?)[\\\]?[\"|\']', str)
+
+    def __generateTmpImage(self, urls,tmp_suffix = PATH.TMP_SUFFIX):
+        '''生成临时文件'''
+        for url in urls:
+            url_file = self.__getFilenameByUrl(url)
+            tmp_file = url_file + tmp_suffix
+            dirname = os.path.dirname(url_file)
+            if (not os.path.exists(url_file)) and (not os.path.exists(tmp_file)):
+                if not os.path.exists(dirname): os.makedirs(dirname)
+                with open(tmp_file, 'w+') as f: f.write(url)
+
+    def __getFilenameByUrl(self,url, root_path=PATH.IMAGE_DOWNLOAD_ROOT):
+        '''根据url获取文件名称'''
+        temp, extension = os.path.splitext(urlparse.urlsplit(url).path)
+        if not extension: extension = '.png'
+        url_path = Utils.getStrMD5(url)+extension
+        return os.path.join(root_path, url_path)
+
+if __name__ == '__main__':
+    zj21cnjy = ZJ21cnjy()
+

@@ -9,6 +9,11 @@ def getCFG(params_name,default=None):
     return config.get(SELECTION_21CN,params_name) if config.has_option(SELECTION_21CN,params_name) else default
 #二一组卷网题目查询类型编码对应关系
 QUES_QUERY_TYPE = {'question_channel_types':'ques_type','difficult_indexs':'difficulty','exam_types':'exam_type','grade_ids':'grade_id'}
+class PATH:
+    #临时文件后缀
+    TMP_SUFFIX = '-tmp'
+    #下载图片的存储的根目录
+    IMAGE_DOWNLOAD_ROOT = 'pic-data'
 class URL:
     #主页面
     ROOT_URL = getCFG('url_root','https://zujuan.21cnjy.com')
@@ -37,8 +42,14 @@ class SQL:
     SELECT_PARAMS_TYPE = 'select subject_code,code_21cnjy,name_21cnjy,code,name from t_ques_type_relation_21cnjy WHERE params_type=%s and status=%s '
     #根据old_id查询题目知识点
     SELECT_POINTS = 'select qid,points from t_ques_21cnjy WHERE old_id=%s'
+    #批量查询题目
+    SELECT_BATCH_QUES = 'SELECT qid,old_id,seq,answer,analyses,content,options FROM t_ques_21cnjy WHERE status = %s AND seq > %s ORDER BY seq ASC LIMIT %s '
     #更新题目的知识点
     UPDATE_POINTS= 'UPDATE t_ques_21cnjy SET points=%s WHERE qid=%s'
+    #更新题目的状态
+    UPDATE_STATUS = 'UPDATE t_ques_21cnjy set status = %s where qid = %s '
     #插入新题目
     INSERT_QUES = 'INSERT INTO  t_ques_21cnjy(qid,answer,analyses,cate,cate_name,content,options,sections,points,subject,difficulty,old_id) ' \
                  'VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+    #插入二一组卷图片url
+    INSERT_IMAGE_URL = 'INSERT into t_21cnjy_img_url (id,qid,urls,status) values(%s,%s,%s,%s)'
