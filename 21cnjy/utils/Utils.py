@@ -138,4 +138,4 @@ def datetime_toString(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 def getCurrMilliSecond():
-    return int(time.time()*1000)
+    return long(time.time()*1000)
