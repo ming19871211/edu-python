@@ -10,11 +10,11 @@ class EMAIL_INFO:
 
 class DEFAULT_PARAM:
     #将触发警报的事件数量
-    num_events=4
+    num_events=2
     #查询最近时间
     last_time=2
     #忽略重复警报时间
-    ignore_realert=12
+    ignore_realert=5
     #es默认索引
     es_index='fluentd-*'
 class PARAM_CODE:
@@ -36,6 +36,6 @@ class ES_INFO:
     RESERVER_DAY = 30  # 日志保留天数（包括当天,至少为1）
 
 bizs=[
-    {'code':'mbzw_gateway','name':'妙笔作文2.0网关','biz_query':'+container_name:mbzw_gateway'},
-    {'code':'jxsls_gateway','name':'优班掌网关','biz_query':'+container_name:jxsls_gateway','query':'log ERROR '}
+    {'code':'mbzw_gateway','name':'妙笔作文2.0网关','biz_query':'+container_name:mbzw_gateway','query':'log:ERROR and log:exception '},
+    {'code':'jxsls_gateway','name':'优班掌网关','biz_query':'+container_name:jxsls_gateway','query':'log:ERROR and log:exception'}
 ]
