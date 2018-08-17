@@ -13,7 +13,7 @@ logger = Utils.getLogger(__name__)
 DAY_SECOND = 24 * 60 * 60
 email = Utils.Email(EMAIL_INFO.email_host,EMAIL_INFO.email_port,EMAIL_INFO.login_user,EMAIL_INFO.login_passwd)
 class ES:
-    def __init__(self,hosts=ES_INFO.es_hosts,http_auth=(ES_INFO.es_user,ES_INFO.es_passwd),describe='测试环境'):
+    def __init__(self,hosts=ES_INFO.es_hosts,http_auth=(ES_INFO.es_user,ES_INFO.es_passwd),describe=u'测试环境'):
         self.hosts=hosts
         self.es=Elasticsearch(hosts=hosts,http_auth=http_auth)
         self.cluster = ClusterClient(self.es)
@@ -65,14 +65,14 @@ class ES:
                 #获取上次发警报的时间
                 key = Utils.getMD5(biz)
                 if not Utils.hasCache(key):
-                    messages = ''
+                    messages = u''
                     i =0
                     for row in rs['hits']['hits']:
                         source = row['_source']
                         container_name = source['container_name']
                         log = source['log']
                         timestamp = source['@timestamp']
-                        message = '[%s---%s]:%s' %(timestamp,container_name,log)
+                        message = u'[%s---%s]:%s' %(timestamp,container_name,log)
                         messages += message
                         i += 1
                         if i >= num_events: break

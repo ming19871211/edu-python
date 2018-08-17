@@ -35,8 +35,8 @@ class ES_INFO:
     RESERVER_DAY = 30  # 日志保留天数（包括当天,至少为1）
 
 bizs=[
-    {'code':'mbzw_gateway','name':'妙笔作文2.0网关','biz_query':'+container_name:mbzw_gateway',
+    {'code':'mbzw_gateway','name':u'妙笔作文2.0网关','biz_query':'+container_name:mbzw_gateway',
      'query':'log:ERROR and log:*exception*','to_addrs':['zhangweiguo@talkweb.com.cn','liaoyongjian@talkweb.com.cn']},
-    {'code':'jxsls_gateway','name':'优班掌网关','biz_query':'+container_name:jxsls_gateway',
+    {'code':'jxsls_gateway','name':u'优班掌网关','biz_query':'+container_name:jxsls_gateway',
      'query':'log:ERROR and log:*exception*','to_addrs':['longji@talkweb.com.cn']}
 ]
