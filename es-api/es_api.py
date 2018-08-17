@@ -92,6 +92,9 @@ class ES:
             logger.info(u'主机:%s，%s-无警告',self.hosts,name)
 
 if __name__ == '__main__':
-    es_test = ES()
-    for biz in bizs:
-        es_test.alertByques(biz)
+    try:
+        es_test = ES()
+        for biz in bizs:
+            es_test.alertByques(biz)
+    except Exception as e:
+        logger.exception(u'执行es日志报警异常,异常信息:%s',e.message)
