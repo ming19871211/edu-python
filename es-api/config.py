@@ -6,8 +6,6 @@ class EMAIL_INFO:
     email_port = 25
     login_user = 'ming19871211@139.com'
     login_passwd = 'ming1234'
-    to_addrs=['meiqiming@talkweb.com.cn']
-
 class DEFAULT_PARAM:
     #将触发警报的事件数量
     num_events=2
@@ -18,6 +16,7 @@ class DEFAULT_PARAM:
     #es默认索引
     es_index='fluentd-*'
 class PARAM_CODE:
+    TO_ADDRS = 'to_addrs'
     CODE='code'
     NAME='name'
     BIZ_QUERY='biz_query'
@@ -36,6 +35,8 @@ class ES_INFO:
     RESERVER_DAY = 30  # 日志保留天数（包括当天,至少为1）
 
 bizs=[
-    {'code':'mbzw_gateway','name':'妙笔作文2.0网关','biz_query':'+container_name:mbzw_gateway','query':'log:ERROR and log:exception '},
-    {'code':'jxsls_gateway','name':'优班掌网关','biz_query':'+container_name:jxsls_gateway','query':'log:ERROR and log:exception'}
+    {'code':'mbzw_gateway','name':'妙笔作文2.0网关','biz_query':'+container_name:mbzw_gateway',
+     'query':'log:ERROR and log:exception ','to_addrs':['zhangweiguo@talkweb.com.cn','liaoyongjian@talkweb.com.cn']},
+    {'code':'jxsls_gateway','name':'优班掌网关','biz_query':'+container_name:jxsls_gateway',
+     'query':'log:ERROR and log:exception','to_addrs':['longji@talkweb.com.cn']}
 ]

@@ -43,8 +43,10 @@ class ES:
             if re.match(partten,key): return True
 
     def alertByques(self,biz, index=DEFAULT_PARAM.es_index):
+        #获取参数
         lastMinute = biz.get(PARAM_CODE.LAST_TIME) if biz.has_key(PARAM_CODE.LAST_TIME) else DEFAULT_PARAM.last_time
         num_events = biz[PARAM_CODE.NUM_EVENTS] if biz.has_key(PARAM_CODE.NUM_EVENTS) else DEFAULT_PARAM.num_events
+        to_addrs =  biz[PARAM_CODE.TO_ADDRS]
         ignore_realert =  biz[PARAM_CODE.IGNORE_REALERT] if biz.has_key(PARAM_CODE.IGNORE_REALERT) else DEFAULT_PARAM.ignore_realert
         name = biz[PARAM_CODE.NAME]
         last_minute =Utils.getCurrMilliSecond() - lastMinute*60*1000
@@ -64,6 +66,7 @@ class ES:
                 key = Utils.getMD5(biz)
                 if not Utils.hasCache(key):
                     messages = ''
+                    i =0
                     for row in rs['hits']['hits']:
                         source = row['_source']
                         container_name = source['container_name']
@@ -71,10 +74,11 @@ class ES:
                         timestamp = source['@timestamp']
                         message = '[%s---%s]:%s' %(timestamp,container_name,log)
                         messages += message
-                        break
+                        i += 1
+                        if i >= num_events: break
                     # 发邮件
                     try:
-                        email.sendmail(message=messages,to_addrs=EMAIL_INFO.to_addrs,topic=u'%s Elasticsearch %s 异常' % (self.describe,name))
+                        email.sendmail(message=messages,to_addrs=to_addrs,topic=u'%s Elasticsearch %s 异常' % (self.describe,name))
                         logger.error(u'主机:%s，%s:已发送报警邮件，查询条件:%s，命中数量：%d', self.hosts, name, query, num)
                     except Exception:
                         logger.exception(u'主机:%s，%s:发送报警邮件失败，查询条件:%s，命中数量：%d', self.hosts, name, query, num)
