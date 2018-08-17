@@ -79,10 +79,10 @@ class ES:
                     # 发邮件
                     try:
                         email.sendmail(message=messages,to_addrs=to_addrs,topic=u'%s Elasticsearch %s 异常' % (self.describe,name))
+                        Utils.saveCache(key, num, ignore_realert)
                         logger.error(u'主机:%s，%s:已发送报警邮件，查询条件:%s，命中数量：%d,,收件人:%s', self.hosts, name, query, num,Utils.toJson(to_addrs))
                     except Exception:
                         logger.exception(u'主机:%s，%s:发送报警邮件失败，查询条件:%s，命中数量：%d', self.hosts, name, query, num)
-                    Utils.saveCache(key,num,ignore_realert)
                 else:
                     logger.info(u'主机:%s，%s-之前已发送过相同的报警，在%s分钟内不需要报警，查询条件:%s，命中数量：%d,',
                                 self.hosts,name,ignore_realert,query, num)
