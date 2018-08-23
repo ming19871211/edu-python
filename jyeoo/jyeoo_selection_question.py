@@ -578,6 +578,7 @@ class JyeooSelectionQuestion:
             if self.err_count > 2:
                 raise Exception(u'获取题目解析异常，答案解析源码是：%s，校验内容是：%s' % (box_wra_html,content_verify))
             else:
+                logger.error(u'检验题目解析时，发生异常，出现次数:%d，答案解析源码：%s,\n校验内容：%s',self.err_count, box_wra_html, content_verify)
                 return (None,None,None)
         self.err_count = 0
         #开始分析
