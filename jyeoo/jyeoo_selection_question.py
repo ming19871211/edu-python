@@ -408,7 +408,8 @@ class JyeooSelectionQuestion:
         time.sleep(random.randint(10, 20))
         #获取题目信息页面
         pageArea_html = driver.find_element_by_id('pageArea').get_attribute('outerHTML')
-        div_soup = BeautifulSoup(pageArea_html, self.features)
+        #初中数学进行特殊处理。
+        div_soup = BeautifulSoup(pageArea_html, 'html.parser' if self.__subject_code in [20] else self.features)
         #判断是页面是否有题目
         if pageArea_html.find(NO_QUES_MESS) > -1:
             #没有题目
