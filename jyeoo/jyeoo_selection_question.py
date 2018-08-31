@@ -545,7 +545,7 @@ class JyeooSelectionQuestion:
         total_pag = int(pages[1])
         # 当前页小于总分页数，并且小于最大允许分页
         if cur_page < total_pag and  cur_page < self.maxPage:
-            next_ele = driver.find_element_by_xpath(u"//div[@id='pageArea']/div[@class='page']/div[@class='pagertips']/a[@class='next'][@title='下一页']")
+            next_ele = driver.find_element_by_xpath(u"//div[@id='pageArea']//div[@class='page']/div[@class='pagertips']/a[@class='next'][@title='下一页']")
             if self.browserType == 2:
                 webdriver.ActionChains(driver).move_to_element(next_ele)
             else:
