@@ -14,7 +14,6 @@ from bs4 import BeautifulSoup #lxml解析器
 from utils import LoggerUtil,Utils
 from utils.SqlUtil import Mysql
 from selenium import webdriver
-from selenium.webdriver.remote.command import Command
 from selenium.webdriver.support.ui import WebDriverWait
 import pickle
 import random
@@ -75,31 +74,36 @@ class YDThread(threading.Thread):
         return driver
 
     def __closeChrome(self,driver):
-        driver.quit()
+        try:
+            driver.quit()
+            logger.info(u'正常关闭浏览器')
+        except Exception:
+            logger.exception(u'关闭浏览器识别哦！')
 
     def run(self):
         id,generate_url, course_id, class_room_id, user_name, user_id, user_mobile, play_time = self.rs
         driver = self.__startChrome()
-        driver.maximize_window()
-        driver.get(generate_url)
-        driver.implicitly_wait(10)
-        #选择需要播放的视频
-        but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
-        WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(but_a_xpath).is_displayed())
-        but_a = driver.find_element_by_xpath(but_a_xpath)
-        webdriver.ActionChains(driver).move_to_element(but_a).perform()
-        but_a.click()
-        #查看是否在播放中
-        playBtn_xpath = "//a[@id='playBtn']"
-        WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(playBtn_xpath).is_displayed())
-        playBtn = driver.find_element_by_xpath(playBtn_xpath)
-        webdriver.ActionChains(driver).move_to_element(playBtn).perform()
         try:
+            driver.maximize_window()
+            driver.get(generate_url)
+            driver.implicitly_wait(10)
+            #选择需要播放的视频
+            but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
+            WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(but_a_xpath).is_displayed())
+            but_a = driver.find_element_by_xpath(but_a_xpath)
+            webdriver.ActionChains(driver).move_to_element(but_a).perform()
+            but_a.click()
+            #查看是否在播放中
+            playBtn_xpath = "//a[@id='playBtn']"
+            WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(playBtn_xpath).is_displayed())
+            playBtn = driver.find_element_by_xpath(playBtn_xpath)
+            webdriver.ActionChains(driver).move_to_element(playBtn).perform()
             isNotPlay = True
             while isNotPlay:
                 logger.info(u'%s-%s,等待下载中...%s',user_name,user_mobile,playBtn.get_attribute('class'))
                 isNotPlay =  "play_btn gs-icon-pause" != playBtn.get_attribute('class')
                 time.sleep(2)
+            #监听实际播放时长哦
             start_time = time.time()
             logger.info(u'%s-%s,开始播放了哦',user_name,user_mobile)
             time.sleep(play_time)
