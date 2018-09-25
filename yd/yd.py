@@ -8,6 +8,7 @@ import threading
 import HTMLParser
 import re
 import time
+import os
 import datetime
 import json
 from bs4 import BeautifulSoup #lxml解析器
@@ -35,7 +36,11 @@ CONCURRENT_NUMBER =  int(getCFG('CONCURRENT_NUMBER',10))
 
 class YD:
     def __init__(self):
-        pass
+        path_str = os.getenv('path')
+        pwd_str = os.getcwd()
+        if path_str.find(pwd_str) == -1:
+            sys.path.append(pwd_str)
+
     def scrapyAll(self,select_sql=SELECT_SQL,thread_num=CONCURRENT_NUMBER):
         count = 1
         total = 0
