@@ -15,8 +15,7 @@ from utils import LoggerUtil,Utils
 from utils.SqlUtil import Mysql
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
-import pickle
-import random
+from selenium.webdriver.common.keys import Keys
 from ConfigParser import ConfigParser
 import sys
 reload(sys)
@@ -24,14 +23,22 @@ sys.setdefaultencoding('utf8')
 logger = LoggerUtil.getLogger(__name__)
 html_parser = HTMLParser.HTMLParser()
 logger = LoggerUtil.getLogger(__name__)
+SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and start_time<= now() and end_time >= now() limit %s"
+
+#读取配置文件
+cfg = ConfigParser()
+cfg.read('yd.cfg')
+SECTION_TYPE = "yd"
+def getCFG(option,defalut): return cfg.get(SECTION_TYPE,option) if cfg.has_option(SECTION_TYPE,option) else defalut
+#并发数量
+CONCURRENT_NUMBER =  int(getCFG('CONCURRENT_NUMBER',10))
 
 class YD:
     def __init__(self):
         pass
-    def scrapyAll(self,select_sql="select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and start_time<= now() and end_time >= now() limit %s "):
+    def scrapyAll(self,select_sql=SELECT_SQL,thread_num=CONCURRENT_NUMBER):
         count = 1
         total = 0
-        thread_num = 10
         while count:
             count = 0
             mysql = Mysql()
@@ -67,6 +74,7 @@ class YDThread(threading.Thread):
             "profile.managed_default_content_settings.images": 1,
             "profile.content_settings.plugin_whitelist.adobe-flash-player": 1,
             "profile.content_settings.exceptions.plugins.*,*.per_resource.adobe-flash-player": 1,
+            "PluginsAllowedForUrls":"https://edu10086.gensee.com"
         }
         chromeOptions = webdriver.ChromeOptions()
         chromeOptions.add_experimental_option('prefs', prefs)
@@ -123,6 +131,7 @@ class YDThread(threading.Thread):
         except Exception:
             logger.exception(u'视频播放出现问题！')
         finally:
+            pass
             self.__closeChrome(driver)
 
 if __name__ == '__main__':
