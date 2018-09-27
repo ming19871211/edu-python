@@ -35,6 +35,8 @@ def getCFG(option,defalut): return cfg.get(SECTION_TYPE,option) if cfg.has_optio
 CONCURRENT_NUMBER =  int(getCFG('CONCURRENT_NUMBER',10))
 #等待下载最大时间
 WAIT_DOWNLOAD_MAX_TIME = int(getCFG('WAIT_DOWNLOAD_MAX_TIME',600))
+total = 0
+fail_total = 0
 
 class YD:
     def __init__(self):
@@ -45,22 +47,24 @@ class YD:
 
     def scrapyAll(self,select_sql=SELECT_SQL,thread_num=CONCURRENT_NUMBER):
         count = 1
-        total = 0
+        global total,fail_total
         while count:
             count = 0
             mysql = Mysql()
             try:
-                for rs in  mysql.getAll(select_sql,(0,thread_num)):
-                    count += 1
-                    id, generate_url, course_id, class_room_id, user_name, user_id, user_mobile, play_time = rs
-                    try:
-                        sql = "update t_hzb_course set state=%s,modify_time=now() WHERE id=%s and user_id=%s"
-                        mysql.execute(sql, (1, id, user_id))
-                        mysql.commit()
-                    except Exception:
-                        mysql.rollback()
-                        logger.exception(u'修改数据状态异常！')
-                    YDThread(rs).start()
+                rows =  mysql.getAll(select_sql,(0,thread_num))
+                if rows:
+                    for rs in rows:
+                        count += 1
+                        id, generate_url, course_id, class_room_id, user_name, user_id, user_mobile, play_time = rs
+                        try:
+                            sql = "update t_hzb_course set state=%s,modify_time=now() WHERE id=%s and user_id=%s"
+                            mysql.execute(sql, (1, id, user_id))
+                            mysql.commit()
+                        except Exception:
+                            mysql.rollback()
+                            logger.exception(u'修改数据状态异常！')
+                        YDThread(rs).start()
             finally:
                 mysql.close()
             for t in threading.enumerate():
@@ -68,7 +72,7 @@ class YD:
                     continue
                 t.join()
             total += count
-            logger.info(u'已处理访问数量%d',total)
+            logger.info(u'合计处理访问数量%d，成功数量%d，失败数量:%d',total,total-fail_total,fail_total)
 
 class YDThread(threading.Thread):
     def __init__(self,rs):
@@ -97,8 +101,8 @@ class YDThread(threading.Thread):
 
     def run(self):
         id,generate_url, course_id, class_room_id, user_name, user_id, user_mobile, play_time = self.rs
-        driver = self.__startChrome()
         try:
+            driver = self.__startChrome()
             driver.maximize_window()
             driver.get(generate_url)
             driver.implicitly_wait(10)
@@ -120,7 +124,7 @@ class YDThread(threading.Thread):
                 logger.info(u'%s-%s,等待下载中...%s',user_name,user_mobile,playBtn.get_attribute('class'))
                 isNotPlay =  "play_btn gs-icon-pause" != playBtn.get_attribute('class')
                 if time.time() - wait_start_time > WAIT_DOWNLOAD_MAX_TIME:
-                    raise Exception(u'等待播放时间超时，超过了最大等待下载时间 %d s'%WAIT_DOWNLOAD_MAX_TIME)
+                    raise Exception(u'等待播放时间超时，超过了最大等待下载时间 %d s'% WAIT_DOWNLOAD_MAX_TIME)
                 time.sleep(2)
             #监听实际播放时长哦
             start_time = time.time()
@@ -140,6 +144,8 @@ class YDThread(threading.Thread):
             finally:
                 mysql.close()
         except Exception as e:
+            global fail_total
+            fail_total += 1
             logger.exception(u'视频播放出现问题！,异常信息:%s',e.message)
         finally:
             self.__closeChrome(driver)
@@ -149,6 +155,7 @@ if __name__ == '__main__':
     while True:
         try:
             yd.scrapyAll()
+            logger.info(u'本次处理已全部完成，30分钟后进行下次处理。')
         except Exception:
-            logger.exception(u'爬虫出现异常哦！')
+            logger.exception(u'爬虫出现异常哦！30分钟后将重新处理 ')
         time.sleep(60*30)
