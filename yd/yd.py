@@ -33,6 +33,8 @@ SECTION_TYPE = "yd"
 def getCFG(option,defalut): return cfg.get(SECTION_TYPE,option) if cfg.has_option(SECTION_TYPE,option) else defalut
 #并发数量
 CONCURRENT_NUMBER =  int(getCFG('CONCURRENT_NUMBER',10))
+#等待下载最大时间
+WAIT_DOWNLOAD_MAX_TIME = int(getCFG('WAIT_DOWNLOAD_MAX_TIME',600))
 
 class YD:
     def __init__(self):
@@ -112,9 +114,13 @@ class YDThread(threading.Thread):
             playBtn = driver.find_element_by_xpath(playBtn_xpath)
             webdriver.ActionChains(driver).move_to_element(playBtn).perform()
             isNotPlay = True
+            #开始等待的下载时间
+            wait_start_time=time.time()
             while isNotPlay:
                 logger.info(u'%s-%s,等待下载中...%s',user_name,user_mobile,playBtn.get_attribute('class'))
                 isNotPlay =  "play_btn gs-icon-pause" != playBtn.get_attribute('class')
+                if time.time() - wait_start_time > WAIT_DOWNLOAD_MAX_TIME:
+                    raise Exception(u'等待播放时间超时，超过了最大等待下载时间 %d s'%WAIT_DOWNLOAD_MAX_TIME)
                 time.sleep(2)
             #监听实际播放时长哦
             start_time = time.time()
@@ -133,10 +139,9 @@ class YDThread(threading.Thread):
                 logger.exception(u'观看视频完成更新时异常')
             finally:
                 mysql.close()
-        except Exception:
-            logger.exception(u'视频播放出现问题！')
+        except Exception as e:
+            logger.exception(u'视频播放出现问题！,异常信息:%s',e.message)
         finally:
-            pass
             self.__closeChrome(driver)
 
 if __name__ == '__main__':
