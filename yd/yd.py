@@ -46,12 +46,38 @@ class YD:
         pwd_str = os.getcwd()
         if path_str.find(pwd_str) == -1:
             sys.path.append(pwd_str)
+        self.__execInitParams()
+
+    def __execInitParams(self):
+        '''初始化参数'''
+        mysql = Mysql()
+        try:
+            for p in mysql.getAll('select param_name,param_value from t_hzb_param where enable=1'):
+                param_name, param_value = p
+                if param_name == 'start_time':
+                    self.__start_time = int(param_value)
+                elif param_name == 'end_time':
+                    self.__end_time = int(param_value)
+            self.__query_time = time.time()
+        finally:
+            mysql.close()
+
+    def isNotRunTime(self):
+        curr_time = time.time()
+        if curr_time - 60*60 > self.__query_time:
+            self.__execInitParams()
+        if curr_time < Utils.gettime(self.__start_time) or curr_time > Utils.gettime(self.__end_time):
+            logger.info(u'已进入夜间休息时间[%d点-%d点]，播放程序不会进行播放', self.__end_time, self.__start_time)
+            return True
+        else:
+            return False
 
     def scrapyAll(self,select_sql=SELECT_SQL,thread_num=CONCURRENT_NUMBER):
         count = 1
         global total,fail_total
         while count:
             count = 0
+            if self.isNotRunTime(): break
             mysql = Mysql()
             try:
                 rows =  mysql.getAll(select_sql,(0,thread_num))

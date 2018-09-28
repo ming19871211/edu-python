@@ -12,7 +12,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.header import Header
 import time
-
+import datetime
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
@@ -128,3 +128,10 @@ def htmlToImages(url,pic_name,width=default_width,height=default_height,cmd=webk
     os.remove(pic_name+'-tmp')
     os.system(cmd % (pic_name, width, height, url))
     return pic_name
+
+def gettime(hour):
+    a = datetime.datetime.now().strftime("%Y-%m-%d")+" %2d:00:00"%hour
+    timeArray = time.strptime(a, "%Y-%m-%d %H:%M:%S")
+    return time.mktime(timeArray)
+
+
