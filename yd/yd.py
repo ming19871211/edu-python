@@ -35,6 +35,8 @@ def getCFG(option,defalut): return cfg.get(SECTION_TYPE,option) if cfg.has_optio
 CONCURRENT_NUMBER =  int(getCFG('CONCURRENT_NUMBER',10))
 #等待下载最大时间
 WAIT_DOWNLOAD_MAX_TIME = int(getCFG('WAIT_DOWNLOAD_MAX_TIME',600))
+CLIENT_NAME = getCFG('CLIENT_NAME','system')
+CLIENT_PHONE = getCFG('CLIENT_PHONE','88888888888')
 total = 0
 fail_total = 0
 
@@ -54,16 +56,19 @@ class YD:
             try:
                 rows =  mysql.getAll(select_sql,(0,thread_num))
                 if rows:
+                    params = []
                     for rs in rows:
                         count += 1
                         id, generate_url, course_id, class_room_id, user_name, user_id, user_mobile, play_time = rs
-                        try:
-                            sql = "update t_hzb_course set state=%s,modify_time=now() WHERE id=%s and user_id=%s"
-                            mysql.execute(sql, (1, id, user_id))
-                            mysql.commit()
-                        except Exception:
-                            mysql.rollback()
-                            logger.exception(u'修改数据状态异常！')
+                        params.append((1,CLIENT_NAME,CLIENT_PHONE, id, user_id))
+                    try:
+                        sql = "update t_hzb_course set state=%s,modify_time=now(),client_name=%s,client_phone=%s WHERE id=%s and user_id=%s"
+                        mysql.batchExecute(sql,params)
+                        mysql.commit()
+                    except Exception:
+                        mysql.rollback()
+                        logger.exception(u'修改数据状态异常！')
+                    for rs in rows:
                         YDThread(rs).start()
             finally:
                 mysql.close()
@@ -135,8 +140,8 @@ class YDThread(threading.Thread):
             logger.info(u'%s-%s,播放结束哦了！目标播放时间：%d s，实际播放时间: %d s',user_name,user_mobile,play_time,real_play_time)
             mysql = Mysql()
             try:
-                sql = "update t_hzb_course set state=%s,real_play_time=%s,modify_time=now() WHERE id=%s and user_id=%s"
-                mysql.execute(sql,(2,real_play_time,id,user_id))
+                sql = "update t_hzb_course set state=%s,real_play_time=%s,modify_time=now(),client_name=%s,client_phone=%s WHERE id=%s and user_id=%s"
+                mysql.execute(sql,(2,real_play_time,CLIENT_NAME,CLIENT_PHONE,id,user_id))
                 mysql.commit()
             except Exception:
                 mysql.rollback()
