@@ -17,6 +17,8 @@ from utils.SqlUtil import Mysql
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.keys import Keys
+import tkinter
+import tkinter.messagebox
 from ConfigParser import ConfigParser
 import sys
 reload(sys)
@@ -24,7 +26,7 @@ sys.setdefaultencoding('utf8')
 logger = LoggerUtil.getLogger(__name__)
 html_parser = HTMLParser.HTMLParser()
 logger = LoggerUtil.getLogger(__name__)
-SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and start_time<= now() and end_time >= now() limit %s"
+SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and start_time<= now() and end_time >= now()  ORDER BY start_time asc limit %s"
 
 #读取配置文件
 cfg = ConfigParser()
@@ -32,11 +34,10 @@ cfg.read('yd.cfg')
 SECTION_TYPE = "yd"
 def getCFG(option,defalut): return cfg.get(SECTION_TYPE,option) if cfg.has_option(SECTION_TYPE,option) else defalut
 #并发数量
-CONCURRENT_NUMBER =  int(getCFG('CONCURRENT_NUMBER',10))
+CONCURRENT_NUMBER =  int(getCFG('CONCURRENT_NUMBER',5))
 #等待下载最大时间
 WAIT_DOWNLOAD_MAX_TIME = int(getCFG('WAIT_DOWNLOAD_MAX_TIME',600))
-CLIENT_NAME = getCFG('CLIENT_NAME','system')
-CLIENT_PHONE = getCFG('CLIENT_PHONE','88888888888')
+
 total = 0
 fail_total = 0
 
@@ -47,7 +48,44 @@ class YD:
         if path_str.find(pwd_str) == -1:
             sys.path.append(pwd_str)
         self.__execInitParams()
+        self.__inputPhone()
 
+    def __on_click(self):
+        self.CLIENT_PHONE = self.__phone_text.get().lstrip()
+        if len(self.CLIENT_PHONE) == 0:
+            tkinter.messagebox.showerror(u'错误', u'手机号码必须输入')
+            logger.error(u"手机号码必须输入!")
+            return
+        else:
+            phone_pat = re.compile('^(1[3-9]\d)\d{8}$')
+            res = re.search(phone_pat, self.CLIENT_PHONE)
+            if not res:
+                tkinter.messagebox.showerror(u'错误', u'手机号码格式不正确！')
+                self.CLIENT_PHONE = None
+                logger.error(u"手机号码格式不正确！")
+                return
+        self.__tk.quit()
+        self.__tk.destroy()
+
+    def __inputPhone(self):
+        self.CLIENT_PHONE = None
+        tk = tkinter.Tk()
+        self.__tk = tk
+        # 标题
+        tk.title(u"输入手机号码")
+        # 标签
+        ll = tkinter.Label(tk,text=u"请输入你的手机号码：")
+        ll.pack()  # 这里的side可以赋值为LEFT  RTGHT TOP  BOTTOM
+        # 输入问题类型
+        self.__phone_text = tkinter.StringVar()
+        entry = tkinter.Entry(tk, textvariable=self.__phone_text)
+        self.__phone_text.set(" ")
+        entry.pack()
+        #确认按钮
+        tkinter.Button(tk, text=u"点击确认", command=self.__on_click).pack()
+        tk.mainloop()
+        if not self.CLIENT_PHONE:
+            exit(-1)
     def __execInitParams(self):
         '''初始化参数'''
         mysql = Mysql()
@@ -73,6 +111,7 @@ class YD:
             return False
 
     def scrapyAll(self,select_sql=SELECT_SQL,thread_num=CONCURRENT_NUMBER):
+        logger.info(u'您已成功开启和教育直播视频软件，你的手机号是:%s',self.CLIENT_PHONE)
         count = 1
         global total,fail_total
         while count:
@@ -86,16 +125,16 @@ class YD:
                     for rs in rows:
                         count += 1
                         id, generate_url, course_id, class_room_id, user_name, user_id, user_mobile, play_time = rs
-                        params.append((1,CLIENT_NAME,CLIENT_PHONE, id, user_id))
+                        params.append((1,self.CLIENT_PHONE, id, user_id))
                     try:
-                        sql = "update t_hzb_course set state=%s,modify_time=now(),client_name=%s,client_phone=%s WHERE id=%s and user_id=%s"
+                        sql = "update t_hzb_course set state=%s,modify_time=now(),client_phone=%s WHERE id=%s and user_id=%s"
                         mysql.batchExecute(sql,params)
                         mysql.commit()
                     except Exception:
                         mysql.rollback()
                         logger.exception(u'修改数据状态异常！')
                     for rs in rows:
-                        YDThread(rs).start()
+                        YDThread(rs,self.CLIENT_PHONE).start()
             finally:
                 mysql.close()
             for t in threading.enumerate():
@@ -103,12 +142,13 @@ class YD:
                     continue
                 t.join()
             total += count
-            logger.info(u'合计处理访问数量%d，成功数量%d，失败数量:%d',total,total-fail_total,fail_total)
+            logger.info(u'客服端手机号码:%s,合计处理访问数量%d，成功数量%d，失败数量:%d',self.CLIENT_PHONE,total,total-fail_total,fail_total)
 
 class YDThread(threading.Thread):
-    def __init__(self,rs):
+    def __init__(self,rs,CLIENT_PHONE):
         threading.Thread.__init__(self)
         self.rs = rs
+        self.CLIENT_PHONE = CLIENT_PHONE
 
     def __startChrome(self):
         # 启动chrome的flash播放器
@@ -166,8 +206,8 @@ class YDThread(threading.Thread):
             logger.info(u'%s-%s,播放结束哦了！目标播放时间：%d s，实际播放时间: %d s',user_name,user_mobile,play_time,real_play_time)
             mysql = Mysql()
             try:
-                sql = "update t_hzb_course set state=%s,real_play_time=%s,modify_time=now(),client_name=%s,client_phone=%s WHERE id=%s and user_id=%s"
-                mysql.execute(sql,(2,real_play_time,CLIENT_NAME,CLIENT_PHONE,id,user_id))
+                sql = "update t_hzb_course set state=%s,real_play_time=%s,modify_time=now(),client_phone=%s WHERE id=%s and user_id=%s"
+                mysql.execute(sql,(2,real_play_time,self.CLIENT_PHONE,id,user_id))
                 mysql.commit()
             except Exception:
                 mysql.rollback()
