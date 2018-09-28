@@ -71,6 +71,7 @@ class YD:
         self.CLIENT_PHONE = None
         tk = tkinter.Tk()
         self.__tk = tk
+        tk.geometry("300x150+300+150")
         # 标题
         tk.title(u"输入手机号码")
         # 标签
@@ -85,6 +86,8 @@ class YD:
         tkinter.Button(tk, text=u"点击确认", command=self.__on_click).pack()
         tk.mainloop()
         if not self.CLIENT_PHONE:
+            tkinter.messagebox.showerror(u'错误', u'手机号码必须输入！')
+            logger.error(u"手机号码必须输入，退出程序")
             exit(-1)
     def __execInitParams(self):
         '''初始化参数'''
