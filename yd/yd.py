@@ -32,12 +32,12 @@ SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,u
 cfg = ConfigParser()
 cfg.read('yd.cfg')
 SECTION_TYPE = "yd"
-def getCFG(option,defalut): return cfg.get(SECTION_TYPE,option) if cfg.has_option(SECTION_TYPE,option) else defalut
+def getCFG(option,defalut=None): return cfg.get(SECTION_TYPE,option) if cfg.has_option(SECTION_TYPE,option) else defalut
 #并发数量
 CONCURRENT_NUMBER =  int(getCFG('CONCURRENT_NUMBER',5))
 #等待下载最大时间
 WAIT_DOWNLOAD_MAX_TIME = int(getCFG('WAIT_DOWNLOAD_MAX_TIME',600))
-
+client_phone = getCFG('CLIENT_PHONE')
 total = 0
 fail_total = 0
 
@@ -48,7 +48,10 @@ class YD:
         if path_str.find(pwd_str) == -1:
             sys.path.append(pwd_str)
         self.__execInitParams()
-        self.__inputPhone()
+        if client_phone:
+            self.CLIENT_PHONE = client_phone
+        else:
+            self.__inputPhone()
 
     def __on_click(self):
         self.CLIENT_PHONE = self.__phone_text.get().lstrip()
