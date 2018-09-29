@@ -40,6 +40,10 @@ WAIT_DOWNLOAD_MAX_TIME = int(getCFG('WAIT_DOWNLOAD_MAX_TIME',600))
 client_phone = getCFG('CLIENT_PHONE')
 total = 0
 fail_total = 0
+#版本号、版本等级
+VERSION = "1.2.2"
+VERSION_LEVEL = 2
+
 
 class YD:
     def __init__(self):
@@ -102,7 +106,17 @@ class YD:
                     self.__start_time = int(param_value)
                 elif param_name == 'end_time':
                     self.__end_time = int(param_value)
+                elif param_name == 'last_version':
+                    self.__last_version = param_value
+                elif param_name == 'support_level':
+                    self.__support_level = int(param_value)
             self.__query_time = time.time()
+            #检查版本
+            if self.__support_level > VERSION_LEVEL:
+                message = u'请升级到最新版本:%s，当前版本%s，下载地址见文档:http://doc.pages.talkedu.cn/hzb/' %(self.__last_version,VERSION)
+                tkinter.messagebox.showerror(u'错误', message)
+                logger.error(message)
+                exit(-1)
         finally:
             mysql.close()
 
@@ -117,7 +131,7 @@ class YD:
             return False
 
     def scrapyAll(self,select_sql=SELECT_SQL,thread_num=CONCURRENT_NUMBER):
-        logger.info(u'您已成功开启和教育直播视频软件，你的手机号是:%s',self.CLIENT_PHONE)
+        logger.info(u'您已成功开启和教育直播视频软件，你的手机号是:%s，当前运行版本：%s，最新版本：%s',self.CLIENT_PHONE,VERSION,self.__last_version)
         count = 1
         global total,fail_total
         while count:
