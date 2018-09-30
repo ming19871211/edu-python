@@ -220,9 +220,11 @@ class YDThread(threading.Thread):
             #监听实际播放时长哦
             start_time = time.time()
             logger.info(u'%s-%s,开始播放了哦',user_name,user_mobile)
-            time.sleep(play_time)
-            end_time = time.time()
-            real_play_time = end_time-start_time
+            real_play_time = time.time() - start_time
+            #防止睡眠时间太长无法唤醒
+            while real_play_time < play_time:
+                time.sleep(5)
+                real_play_time = time.time()-start_time
             logger.info(u'%s-%s,播放结束哦了！目标播放时间：%d s，实际播放时间: %d s',user_name,user_mobile,play_time,real_play_time)
             mysql = Mysql()
             try:
