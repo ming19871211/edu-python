@@ -41,7 +41,7 @@ client_phone = getCFG('CLIENT_PHONE')
 total = 0
 fail_total = 0
 #版本号、版本等级
-VERSION = "1.2.2"
+VERSION = "1.2.3"
 VERSION_LEVEL = 2
 
 
