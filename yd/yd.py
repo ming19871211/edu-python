@@ -199,6 +199,7 @@ class YDThread(threading.Thread):
             driver.implicitly_wait(10)
             #选择需要播放的视频
             but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
+            # but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toWatch(%s,%s);'][@class='but_a']" % (course_id, class_room_id)
             WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(but_a_xpath).is_displayed())
             but_a = driver.find_element_by_xpath(but_a_xpath)
             webdriver.ActionChains(driver).move_to_element(but_a).perform()
