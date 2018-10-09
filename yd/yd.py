@@ -9,6 +9,8 @@ import HTMLParser
 import re
 import time
 import os
+import random
+import pickle
 import datetime
 import json
 from bs4 import BeautifulSoup #lxml解析器
@@ -38,12 +40,18 @@ CONCURRENT_NUMBER =  int(getCFG('CONCURRENT_NUMBER',5))
 #等待下载最大时间
 WAIT_DOWNLOAD_MAX_TIME = int(getCFG('WAIT_DOWNLOAD_MAX_TIME',600))
 client_phone = getCFG('CLIENT_PHONE')
+#是否直播
+isLive=bool(getCFG('IS_LIVE'))
+playTypeStr= u'直播' if isLive else u'回顾'
+#获取回顾与直播的查询语句
+SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and live_start_time<= now() and live_end_time >= now()  ORDER BY start_time asc limit %s" if isLive \
+    else  "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and start_time<= now() and end_time >= now()  ORDER BY start_time asc limit %s"
+
 total = 0
 fail_total = 0
 #版本号、版本等级
-VERSION = "1.2.3"
-VERSION_LEVEL = 2
-
+VERSION = "1.3.1"
+VERSION_LEVEL = 3
 
 class YD:
     def __init__(self):
@@ -54,6 +62,7 @@ class YD:
         self.__execInitParams()
         if client_phone:
             self.CLIENT_PHONE = client_phone
+            self.CONCURRENT_NUMBER = CONCURRENT_NUMBER
         else:
             self.__inputPhone()
 
@@ -71,8 +80,42 @@ class YD:
                 self.CLIENT_PHONE = None
                 logger.error(u"手机号码格式不正确！")
                 return
+        #并发数
+        concurrent_number = self.__concurrent_number.get().lstrip()
+        if len(concurrent_number) == 0:
+            tkinter.messagebox.showerror(u'错误', u'开启浏览器数量必须输入')
+            logger.error(u"开启浏览器数量必须输入!")
+            return
+        else:
+            print concurrent_number
+            concurrent_pat = re.compile('^[1-9][0-5]?$')
+            res_c = re.search(concurrent_pat, concurrent_number)
+            if not res_c:
+                tkinter.messagebox.showerror(u'错误', u'开启浏览器数必须为1到15之间的数值')
+                self.CLIENT_PHONE = None
+                logger.error(u"开启浏览器数必须为1到15之间的数值！")
+                return
+        self.CONCURRENT_NUMBER = int(concurrent_number)
+
+        #保留最后一次输入的手机号码、并发数
+        self.__saveInfo(clientPhone=self.CLIENT_PHONE,concurrent_number=self.CONCURRENT_NUMBER)
         self.__tk.quit()
         self.__tk.destroy()
+    def __saveInfo(self,clientPhone=None,concurrent_number=None):
+        my_yd_info = {'CLIENT_PHONE': clientPhone,'CONCURRENT_NUMBER':concurrent_number}
+        pickle.dump(my_yd_info, open("my-yd-info.pkl","wb"))
+    def __getInfoPhone(self):
+        try:
+            my_yd_info = pickle.load(open("my-yd-info.pkl","rb"))
+            return my_yd_info['CLIENT_PHONE']
+        except Exception:
+            return ' '
+    def __getInfoConcurrentNumber(self):
+        try:
+            my_yd_info = pickle.load(open("my-yd-info.pkl","rb"))
+            return my_yd_info['CONCURRENT_NUMBER']
+        except Exception:
+            return CONCURRENT_NUMBER if CONCURRENT_NUMBER >= 1 and CONCURRENT_NUMBER <= 15 else 15
 
     def __inputPhone(self):
         self.CLIENT_PHONE = None
@@ -84,16 +127,23 @@ class YD:
         # 标签
         ll = tkinter.Label(tk,text=u"请输入你的手机号码：")
         ll.pack()  # 这里的side可以赋值为LEFT  RTGHT TOP  BOTTOM
-        # 输入问题类型
+        # 输入手机号码
         self.__phone_text = tkinter.StringVar()
         entry = tkinter.Entry(tk, textvariable=self.__phone_text)
-        self.__phone_text.set(" ")
+        self.__phone_text.set(self.__getInfoPhone())
         entry.pack()
+        #输入CONCURRENT_NUMBER
+        ll2 = tkinter.Label(tk, text=u"同时开启浏览器数量")
+        ll2.pack()
+        self.__concurrent_number = tkinter.StringVar()
+        entry_concurrent = tkinter.Entry(tk, textvariable=self.__concurrent_number)
+        self.__concurrent_number.set(self.__getInfoConcurrentNumber())
+        entry_concurrent.pack()
         #确认按钮
         tkinter.Button(tk, text=u"点击确认", command=self.__on_click).pack()
         tk.mainloop()
         if not self.CLIENT_PHONE:
-            tkinter.messagebox.showerror(u'错误', u'手机号码必须输入！')
+            tkinter.messagebox.showerror(u'错误', u'手机号码或浏览器数量必须输入！')
             logger.error(u"手机号码必须输入，退出程序")
             exit(-1)
     def __execInitParams(self):
@@ -122,7 +172,7 @@ class YD:
 
     def isNotRunTime(self):
         curr_time = time.time()
-        if curr_time - 60*60 > self.__query_time:
+        if curr_time - 60*60*2 > self.__query_time:
             self.__execInitParams()
         if curr_time < Utils.gettime(self.__start_time) or curr_time > Utils.gettime(self.__end_time):
             logger.info(u'已进入夜间休息时间[%d点-%d点]，播放程序不会进行播放', self.__end_time, self.__start_time)
@@ -130,8 +180,9 @@ class YD:
         else:
             return False
 
-    def scrapyAll(self,select_sql=SELECT_SQL,thread_num=CONCURRENT_NUMBER):
-        logger.info(u'您已成功开启和教育直播视频软件，你的手机号是:%s，当前运行版本：%s，最新版本：%s',self.CLIENT_PHONE,VERSION,self.__last_version)
+    def scrapyAll(self,select_sql=SELECT_SQL,thread_num=None):
+        thread_num = thread_num if thread_num else self.CONCURRENT_NUMBER
+        logger.info(u'您已成功开启和教育直播视频软件（%s），你的手机号是:%s，当前运行版本：%s，最新版本：%s,预计最多开启浏览器数:%s',playTypeStr,self.CLIENT_PHONE,VERSION,self.__last_version,thread_num)
         count = 1
         global total,fail_total
         while count:
@@ -198,39 +249,67 @@ class YDThread(threading.Thread):
             driver.get(generate_url)
             driver.implicitly_wait(10)
             #选择需要播放的视频
-            but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
-            # but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toWatch(%s,%s);'][@class='but_a']" % (course_id, class_room_id)
+            but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toWatch(%s,%s);'][@class='but_a']" % (course_id, class_room_id) if isLive \
+                else "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
             WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(but_a_xpath).is_displayed())
             but_a = driver.find_element_by_xpath(but_a_xpath)
             webdriver.ActionChains(driver).move_to_element(but_a).perform()
             but_a.click()
-            #查看是否在播放中
-            playBtn_xpath = "//a[@id='playBtn']"
-            WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(playBtn_xpath).is_displayed())
-            playBtn = driver.find_element_by_xpath(playBtn_xpath)
-            webdriver.ActionChains(driver).move_to_element(playBtn).perform()
-            isNotPlay = True
-            #开始等待的下载时间
-            wait_start_time=time.time()
-            while isNotPlay:
-                logger.info(u'%s-%s,等待下载中...%s',user_name,user_mobile,playBtn.get_attribute('class'))
-                isNotPlay =  "play_btn gs-icon-pause" != playBtn.get_attribute('class')
-                if time.time() - wait_start_time > WAIT_DOWNLOAD_MAX_TIME:
-                    raise Exception(u'等待播放时间超时，超过了最大等待下载时间 %d s'% WAIT_DOWNLOAD_MAX_TIME)
-                time.sleep(2)
-            #监听实际播放时长哦
-            start_time = time.time()
-            logger.info(u'%s-%s,开始播放了哦',user_name,user_mobile)
-            real_play_time = time.time() - start_time
-            #防止睡眠时间太长无法唤醒
-            while real_play_time < play_time:
-                time.sleep(5)
-                real_play_time = time.time()-start_time
-            logger.info(u'%s-%s,播放结束哦了！目标播放时间：%d s，实际播放时间: %d s',user_name,user_mobile,play_time,real_play_time)
+            if isLive:
+                #监听是否已开始播放了
+                sys_info_xpath = '//div[@class="system_info de"]'
+                wait_start_time = time.time()
+                while True:
+                    try:
+                        WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(sys_info_xpath).is_displayed())
+                        sys_info = driver.find_element_by_xpath(sys_info_xpath)
+                        if sys_info.get_attribute('style') == 'display: block; top: 0px;':
+                            logger.info(u'%s-%s,直播已经开始播放了哦', user_name, user_mobile)
+                            break
+                        else:
+                            logger.info(u'%s-%s,直播并没有播放了哦', user_name, user_mobile)
+                        if time.time() - wait_start_time > WAIT_DOWNLOAD_MAX_TIME:
+                            raise Exception(u'等待“直播”播放时间超时，超过了最大等待下载时间 %d s' % WAIT_DOWNLOAD_MAX_TIME)
+                    except  Exception:
+                        pass
+                # 监听实际播放时长哦
+                live_play_time = random.randint(10*60,12*60)   #随机获取播放时间
+                start_time = time.time()
+                real_play_time = time.time() - start_time
+                # 防止睡眠时间太长无法唤醒
+                while real_play_time < live_play_time:
+                    time.sleep(5)
+                    real_play_time = time.time() - start_time
+                logger.info(u'%s-%s,播放结束哦了！目标播放时间：%d s，实际播放时间: %d s', user_name, user_mobile, live_play_time, real_play_time)
+            else:
+                #查看是否在播放中
+                playBtn_xpath = "//a[@id='playBtn']"
+                time.sleep(100)
+                WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(playBtn_xpath).is_displayed())
+                playBtn = driver.find_element_by_xpath(playBtn_xpath)
+                webdriver.ActionChains(driver).move_to_element(playBtn).perform()
+                isNotPlay = True
+                #开始等待的下载时间
+                wait_start_time=time.time()
+                while isNotPlay:
+                    logger.info(u'%s-%s,等待下载中...%s',user_name,user_mobile,playBtn.get_attribute('class'))
+                    isNotPlay =  "play_btn gs-icon-pause" != playBtn.get_attribute('class')
+                    if time.time() - wait_start_time > WAIT_DOWNLOAD_MAX_TIME:
+                        raise Exception(u'等待播放时间超时，超过了最大等待下载时间 %d s'% WAIT_DOWNLOAD_MAX_TIME)
+                    time.sleep(2)
+                #监听实际播放时长哦
+                start_time = time.time()
+                logger.info(u'%s-%s,开始播放了哦',user_name,user_mobile)
+                real_play_time = time.time() - start_time
+                #防止睡眠时间太长无法唤醒
+                while real_play_time < play_time:
+                    time.sleep(5)
+                    real_play_time = time.time()-start_time
+                logger.info(u'%s-%s,播放结束哦了！目标播放时间：%d s，实际播放时间: %d s',user_name,user_mobile,play_time,real_play_time)
             mysql = Mysql()
             try:
-                sql = "update t_hzb_course set state=%s,real_play_time=%s,modify_time=now(),client_phone=%s WHERE id=%s and user_id=%s"
-                mysql.execute(sql,(2,real_play_time,self.CLIENT_PHONE,id,user_id))
+                sql = "update t_hzb_course set state=%s,real_play_time=%s,modify_time=now(),client_phone=%s,play_type=%s WHERE id=%s and user_id=%s"
+                mysql.execute(sql,(2,real_play_time,self.CLIENT_PHONE,1 if isLive else 0,id,user_id))
                 mysql.commit()
             except Exception:
                 mysql.rollback()
@@ -246,10 +325,11 @@ class YDThread(threading.Thread):
 
 if __name__ == '__main__':
     yd = YD()
+    sleep_time= 2 if isLive else 30
     while True:
         try:
             yd.scrapyAll()
-            logger.info(u'本次处理已全部完成，30分钟后进行下次处理。')
+            logger.info(u'本次处理已全部完成，%d分钟后进行下次处理。',sleep_time)
         except Exception:
-            logger.exception(u'爬虫出现异常哦！30分钟后将重新处理 ')
-        time.sleep(60*30)
+            logger.exception(u'爬虫出现异常哦！%d分钟后将重新处理 ',sleep_time)
+        time.sleep(60*sleep_time)
