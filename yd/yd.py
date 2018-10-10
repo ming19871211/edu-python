@@ -159,6 +159,11 @@ class YD:
                     self.__last_version = param_value
                 elif param_name == 'support_level':
                     self.__support_level = int(param_value)
+                elif param_name == 'min_live_play_time':
+                    self.__min_live_play_time = int(param_value)
+                elif param_name == 'max_live_play_time':
+                    self.__max_live_play_time = int(param_value)
+
             self.__query_time = time.time()
             #检查版本
             if self.__support_level > VERSION_LEVEL:
@@ -204,7 +209,7 @@ class YD:
                         mysql.rollback()
                         logger.exception(u'修改数据状态异常！')
                     for rs in rows:
-                        YDThread(rs,self.CLIENT_PHONE).start()
+                        YDThread(rs,self.CLIENT_PHONE,self.__min_live_play_time,self.__max_live_play_time).start()
             finally:
                 mysql.close()
             for t in threading.enumerate():
@@ -215,10 +220,12 @@ class YD:
             logger.info(u'客服端手机号码:%s,合计处理访问数量%d，成功数量%d，失败数量:%d',self.CLIENT_PHONE,total,total-fail_total,fail_total)
 
 class YDThread(threading.Thread):
-    def __init__(self,rs,CLIENT_PHONE):
+    def __init__(self,rs,CLIENT_PHONE,min_live_play_time,max_live_play_time):
         threading.Thread.__init__(self)
         self.rs = rs
         self.CLIENT_PHONE = CLIENT_PHONE
+        self.min_live_play_time= min_live_play_time
+        self.max_live_play_time = max_live_play_time
 
     def __startChrome(self):
         # 启动chrome的flash播放器
@@ -254,7 +261,7 @@ class YDThread(threading.Thread):
             but_a = driver.find_element_by_xpath(but_a_xpath)
             webdriver.ActionChains(driver).move_to_element(but_a).perform()
             but_a.click()
-            if isLive:
+            if isLive: #直播
                 #监听是否已开始播放了
                 sys_info_xpath = '//div[@class="system_info de"]'
                 wait_start_time = time.time()
@@ -272,7 +279,7 @@ class YDThread(threading.Thread):
                     except  Exception:
                         pass
                 # 监听实际播放时长哦
-                live_play_time = random.randint(10*60,12*60)   #随机获取播放时间
+                live_play_time = random.randint(self.min_live_play_time,self.max_live_play_time)   #随机获取播放时间
                 start_time = time.time()
                 real_play_time = time.time() - start_time
                 # 防止睡眠时间太长无法唤醒
