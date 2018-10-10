@@ -87,7 +87,6 @@ class YD:
             logger.error(u"开启浏览器数量必须输入!")
             return
         else:
-            print concurrent_number
             concurrent_pat = re.compile('^[1-9][0-5]?$')
             res_c = re.search(concurrent_pat, concurrent_number)
             if not res_c:
