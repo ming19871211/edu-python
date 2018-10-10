@@ -81,19 +81,19 @@ class YD:
                 self.CLIENT_PHONE = None
                 logger.error(u"手机号码格式不正确！")
                 return
-        #并发数
+        #回顾并发数
         concurrent_number = self.__concurrent_number.get().lstrip()
         if len(concurrent_number) == 0:
-            tkinter.messagebox.showerror(u'错误', u'开启浏览器数量必须输入')
-            logger.error(u"开启浏览器数量必须输入!")
+            tkinter.messagebox.showerror(u'错误', u'开启浏览器回顾数量必须输入')
+            logger.error(u"开启浏览器回顾数量必须输入!")
             return
         else:
             concurrent_pat = re.compile('^[1-9][0-5]?$')
             res_c = re.search(concurrent_pat, concurrent_number)
             if not res_c:
-                tkinter.messagebox.showerror(u'错误', u'开启浏览器数必须为1到15之间的数值')
+                tkinter.messagebox.showerror(u'错误', u'开启浏览器回顾数必须为1到15之间的数值')
                 self.CLIENT_PHONE = None
-                logger.error(u"开启浏览器数必须为1到15之间的数值！")
+                logger.error(u"开启浏览器回顾数必须为1到15之间的数值！")
                 return
         self.CONCURRENT_NUMBER = int(concurrent_number)
 
@@ -107,9 +107,9 @@ class YD:
             live_concurrent_pat = re.compile('^[1-9][0-5]?$')
             res_c_l = re.search(live_concurrent_pat, live_concurrent_number)
             if not res_c_l:
-                tkinter.messagebox.showerror(u'错误', u'开启直播浏览器数必须为1到15之间的数值')
+                tkinter.messagebox.showerror(u'错误', u'开启浏览器直播数必须为1到15之间的数值')
                 self.CLIENT_PHONE = None
-                logger.error(u"开启直播浏览器数必须为1到15之间的数值！")
+                logger.error(u"开启浏览器直播数必须为1到15之间的数值！")
                 return
         self.LIVE_CONCURRENT_NUMBER = int(live_concurrent_number)
 
@@ -247,6 +247,9 @@ class YD:
                         logger.exception(u'修改数据状态异常！')
                     for rs in rows:
                         YDThread(rs,self.CLIENT_PHONE,self.is_live,self.__min_live_play_time,self.__max_live_play_time).start()
+                else:
+                    logger.info(u'客服端手机号码:%s,当前时间已没有可以播放的直播或者回顾的视频了哦！',self.CLIENT_PHONE)
+                    break
             finally:
                 mysql.close()
             for t in threading.enumerate():
@@ -374,8 +377,8 @@ if __name__ == '__main__':
     while True:
         try:
             yd.scrapyAll()
-            logger.info(u'本次处理已全部完成，%d分钟后进行下次处理。',sleep_time)
+            logger.info(u'本次检测处理已全部完成，%d分钟后进行下次检测处理。',sleep_time)
             time.sleep(60 * sleep_time)
         except Exception:
-            logger.exception(u'爬虫出现异常哦！%d分钟后将重新处理 ',error_time)
+            logger.exception(u'刷课程序出现异常哦！%d分钟后将重新处理 ',error_time)
             time.sleep(60 * error_time)
