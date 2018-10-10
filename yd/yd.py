@@ -37,15 +37,15 @@ SECTION_TYPE = "yd"
 def getCFG(option,defalut=None): return cfg.get(SECTION_TYPE,option) if cfg.has_option(SECTION_TYPE,option) else defalut
 #并发数量
 CONCURRENT_NUMBER =  int(getCFG('CONCURRENT_NUMBER',5))
+#直播并发数量
+LIVE_CONCURRENT_NUMBER =  int(getCFG('LIVE_CONCURRENT_NUMBER',5))
 #等待下载最大时间
 WAIT_DOWNLOAD_MAX_TIME = int(getCFG('WAIT_DOWNLOAD_MAX_TIME',600))
 client_phone = getCFG('CLIENT_PHONE')
-#是否直播
-isLive=bool(getCFG('IS_LIVE'))
-playTypeStr= u'直播' if isLive else u'回顾'
-#获取回顾与直播的查询语句
-SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and live_start_time<= now() and live_end_time >= now()  ORDER BY start_time asc limit %s" if isLive \
-    else  "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and start_time<= now() and end_time >= now()  ORDER BY start_time asc limit %s"
+#回顾的查询语句
+SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and start_time<= now() and end_time >= now()  ORDER BY start_time asc limit %s"
+#直播的查询语句
+LIVE_SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and live_start_time<= now() and live_end_time >= now()  ORDER BY start_time asc limit %s"
 
 total = 0
 fail_total = 0
@@ -63,6 +63,7 @@ class YD:
         if client_phone:
             self.CLIENT_PHONE = client_phone
             self.CONCURRENT_NUMBER = CONCURRENT_NUMBER
+            self.LIVE_CONCURRENT_NUMBER = LIVE_CONCURRENT_NUMBER
         else:
             self.__inputPhone()
 
@@ -96,12 +97,28 @@ class YD:
                 return
         self.CONCURRENT_NUMBER = int(concurrent_number)
 
+        # 直播并发数
+        live_concurrent_number = self.__live_concurrent_number.get().lstrip()
+        if len(live_concurrent_number) == 0:
+            tkinter.messagebox.showerror(u'错误', u'开启浏览器直播数量必须输入')
+            logger.error(u"开启浏览器直播数量必须输入!")
+            return
+        else:
+            live_concurrent_pat = re.compile('^[1-9][0-5]?$')
+            res_c_l = re.search(live_concurrent_pat, live_concurrent_number)
+            if not res_c_l:
+                tkinter.messagebox.showerror(u'错误', u'开启直播浏览器数必须为1到15之间的数值')
+                self.CLIENT_PHONE = None
+                logger.error(u"开启直播浏览器数必须为1到15之间的数值！")
+                return
+        self.LIVE_CONCURRENT_NUMBER = int(live_concurrent_number)
+
         #保留最后一次输入的手机号码、并发数
-        self.__saveInfo(clientPhone=self.CLIENT_PHONE,concurrent_number=self.CONCURRENT_NUMBER)
+        self.__saveInfo(clientPhone=self.CLIENT_PHONE,concurrent_number=self.CONCURRENT_NUMBER,live_concurrent_number=self.LIVE_CONCURRENT_NUMBER)
         self.__tk.quit()
         self.__tk.destroy()
-    def __saveInfo(self,clientPhone=None,concurrent_number=None):
-        my_yd_info = {'CLIENT_PHONE': clientPhone,'CONCURRENT_NUMBER':concurrent_number}
+    def __saveInfo(self,clientPhone=None,concurrent_number=None,live_concurrent_number=None):
+        my_yd_info = {'CLIENT_PHONE': clientPhone,'CONCURRENT_NUMBER':concurrent_number,'LIVE_CONCURRENT_NUMBER':live_concurrent_number}
         pickle.dump(my_yd_info, open("my-yd-info.pkl","wb"))
     def __getInfoPhone(self):
         try:
@@ -115,6 +132,12 @@ class YD:
             return my_yd_info['CONCURRENT_NUMBER']
         except Exception:
             return CONCURRENT_NUMBER if CONCURRENT_NUMBER >= 1 and CONCURRENT_NUMBER <= 15 else 15
+    def __getInfoLiveConcurrentNumber(self):
+        try:
+            my_yd_info = pickle.load(open("my-yd-info.pkl","rb"))
+            return my_yd_info['LIVE_CONCURRENT_NUMBER']
+        except Exception:
+            return LIVE_CONCURRENT_NUMBER if LIVE_CONCURRENT_NUMBER >= 1 and LIVE_CONCURRENT_NUMBER <= 15 else 15
 
     def __inputPhone(self):
         self.CLIENT_PHONE = None
@@ -132,12 +155,19 @@ class YD:
         self.__phone_text.set(self.__getInfoPhone())
         entry.pack()
         #输入CONCURRENT_NUMBER
-        ll2 = tkinter.Label(tk, text=u"同时开启浏览器数量")
+        ll2 = tkinter.Label(tk, text=u"同时开启回顾浏览器数量")
         ll2.pack()
         self.__concurrent_number = tkinter.StringVar()
         entry_concurrent = tkinter.Entry(tk, textvariable=self.__concurrent_number)
         self.__concurrent_number.set(self.__getInfoConcurrentNumber())
         entry_concurrent.pack()
+        # 输入CONCURRENT_NUMBER
+        ll3 = tkinter.Label(tk, text=u"同时开启直播浏览器数量")
+        ll3.pack()
+        self.__live_concurrent_number = tkinter.StringVar()
+        entry_live_concurrent = tkinter.Entry(tk, textvariable=self.__live_concurrent_number)
+        self.__live_concurrent_number.set(self.__getInfoLiveConcurrentNumber())
+        entry_live_concurrent.pack()
         #确认按钮
         tkinter.Button(tk, text=u"点击确认", command=self.__on_click).pack()
         tk.mainloop()
@@ -184,9 +214,11 @@ class YD:
         else:
             return False
 
-    def scrapyAll(self,select_sql=SELECT_SQL,thread_num=None):
+    def scrapyAll(self,select_sql=SELECT_SQL,live_select_sql=LIVE_SELECT_SQL,thread_num=None,live_thread_num=None):
         thread_num = thread_num if thread_num else self.CONCURRENT_NUMBER
-        logger.info(u'您已成功开启和教育直播视频软件（%s），你的手机号是:%s，当前运行版本：%s，最新版本：%s,预计最多开启浏览器数:%s',playTypeStr,self.CLIENT_PHONE,VERSION,self.__last_version,thread_num)
+        live_thread_num = live_thread_num if live_thread_num else self.LIVE_CONCURRENT_NUMBER
+        logger.info(u'您已成功开启和教育直播视频软件，你的手机号是:%s，当前运行版本：%s，最新版本：%s,回顾开启浏览器数:%s,直播开启浏览器数量:%s',
+                    self.CLIENT_PHONE,VERSION,self.__last_version,thread_num,self.LIVE_CONCURRENT_NUMBER)
         count = 1
         global total,fail_total
         while count:
@@ -194,7 +226,12 @@ class YD:
             if self.isNotRunTime(): break
             mysql = Mysql()
             try:
-                rows =  mysql.getAll(select_sql,(0,thread_num))
+                rows = mysql.getAll(live_select_sql, (0,live_thread_num))
+                if rows:
+                    self.is_live = True
+                else:
+                    self.is_live = False
+                    rows = mysql.getAll(select_sql,(0,thread_num))
                 if rows:
                     params = []
                     for rs in rows:
@@ -209,7 +246,7 @@ class YD:
                         mysql.rollback()
                         logger.exception(u'修改数据状态异常！')
                     for rs in rows:
-                        YDThread(rs,self.CLIENT_PHONE,self.__min_live_play_time,self.__max_live_play_time).start()
+                        YDThread(rs,self.CLIENT_PHONE,self.is_live,self.__min_live_play_time,self.__max_live_play_time).start()
             finally:
                 mysql.close()
             for t in threading.enumerate():
@@ -220,10 +257,11 @@ class YD:
             logger.info(u'客服端手机号码:%s,合计处理访问数量%d，成功数量%d，失败数量:%d',self.CLIENT_PHONE,total,total-fail_total,fail_total)
 
 class YDThread(threading.Thread):
-    def __init__(self,rs,CLIENT_PHONE,min_live_play_time,max_live_play_time):
+    def __init__(self,rs,CLIENT_PHONE,is_live,min_live_play_time,max_live_play_time):
         threading.Thread.__init__(self)
         self.rs = rs
         self.CLIENT_PHONE = CLIENT_PHONE
+        self.is_live = is_live
         self.min_live_play_time= min_live_play_time
         self.max_live_play_time = max_live_play_time
 
@@ -255,13 +293,13 @@ class YDThread(threading.Thread):
             driver.get(generate_url)
             driver.implicitly_wait(10)
             #选择需要播放的视频
-            but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toWatch(%s,%s);'][@class='but_a']" % (course_id, class_room_id) if isLive \
+            but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toWatch(%s,%s);'][@class='but_a']" % (course_id, class_room_id) if self.is_live \
                 else "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
             WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(but_a_xpath).is_displayed())
             but_a = driver.find_element_by_xpath(but_a_xpath)
             webdriver.ActionChains(driver).move_to_element(but_a).perform()
             but_a.click()
-            if isLive: #直播
+            if self.is_live: #直播
                 #监听是否已开始播放了
                 sys_info_xpath = '//div[@class="system_info de"]'
                 wait_start_time = time.time()
@@ -315,7 +353,7 @@ class YDThread(threading.Thread):
             mysql = Mysql()
             try:
                 sql = "update t_hzb_course set state=%s,real_play_time=%s,modify_time=now(),client_phone=%s,play_type=%s WHERE id=%s and user_id=%s"
-                mysql.execute(sql,(2,real_play_time,self.CLIENT_PHONE,1 if isLive else 0,id,user_id))
+                mysql.execute(sql,(2,real_play_time,self.CLIENT_PHONE,1 if self.is_live else 0,id,user_id))
                 mysql.commit()
             except Exception:
                 mysql.rollback()
@@ -331,11 +369,13 @@ class YDThread(threading.Thread):
 
 if __name__ == '__main__':
     yd = YD()
-    sleep_time= 2 if isLive else 30
+    sleep_time= 5
+    error_time= 1
     while True:
         try:
             yd.scrapyAll()
             logger.info(u'本次处理已全部完成，%d分钟后进行下次处理。',sleep_time)
+            time.sleep(60 * sleep_time)
         except Exception:
-            logger.exception(u'爬虫出现异常哦！%d分钟后将重新处理 ',sleep_time)
-        time.sleep(60*sleep_time)
+            logger.exception(u'爬虫出现异常哦！%d分钟后将重新处理 ',error_time)
+            time.sleep(60 * error_time)
