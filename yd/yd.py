@@ -45,7 +45,7 @@ client_phone = getCFG('CLIENT_PHONE')
 #回顾的查询语句
 SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and start_time<= now() and end_time >= now()  ORDER BY start_time asc limit %s"
 #直播的查询语句
-LIVE_SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and live_start_time<= now() and live_end_time >= now()  ORDER BY start_time asc limit %s"
+LIVE_SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and live_start_time<= now() and live_end_time >= now()  limit %s"
 
 total = 0
 fail_total = 0
@@ -217,7 +217,7 @@ class YD:
     def scrapyAll(self,select_sql=SELECT_SQL,live_select_sql=LIVE_SELECT_SQL,thread_num=None,live_thread_num=None):
         thread_num = thread_num if thread_num else self.CONCURRENT_NUMBER
         live_thread_num = live_thread_num if live_thread_num else self.LIVE_CONCURRENT_NUMBER
-        logger.info(u'您已成功开启和教育直播视频软件，你的手机号是:%s，当前运行版本：%s，最新版本：%s,回顾开启浏览器数:%s,直播开启浏览器数量:%s',
+        logger.info(u'[您已成功开启和教育直播视频软件正式版本]--您的手机号是:%s 当前运行版本:%s 最新版本:%s 回顾开启浏览器数:%s 直播开启浏览器数量:%s',
                     self.CLIENT_PHONE,VERSION,self.__last_version,thread_num,self.LIVE_CONCURRENT_NUMBER)
         count = 1
         global total,fail_total
