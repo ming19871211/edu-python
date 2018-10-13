@@ -45,13 +45,13 @@ client_phone = getCFG('CLIENT_PHONE')
 #回顾的查询语句
 SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and start_time<= now() and end_time >= now()  ORDER BY start_time asc limit %s"
 #直播的查询语句
-LIVE_SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state='%s'  and live_start_time<= now() and live_end_time >= now()  limit %s"
+LIVE_SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user_id,user_mobile,play_time from t_hzb_course WHERE state=%s and play_type=1  and live_start_time<= now() and live_end_time >= now() ORDER BY rand() limit %s"
 
 total = 0
 fail_total = 0
 #版本号、版本等级
-VERSION = "1.3.1"
-VERSION_LEVEL = 3
+VERSION = "1.4.1"
+VERSION_LEVEL = 4
 
 class YD:
     def __init__(self):
@@ -315,10 +315,10 @@ class YDThread(threading.Thread):
                             break
                         else:
                             logger.info(u'%s-%s,直播并没有播放了哦', user_name, user_mobile)
-                        if time.time() - wait_start_time > WAIT_DOWNLOAD_MAX_TIME:
-                            raise Exception(u'等待“直播”播放时间超时，超过了最大等待下载时间 %d s' % WAIT_DOWNLOAD_MAX_TIME)
                     except  Exception:
                         pass
+                    if time.time() - wait_start_time > WAIT_DOWNLOAD_MAX_TIME:
+                        raise Exception(u'等待“直播”播放时间超时，超过了最大等待下载时间 %d s' % WAIT_DOWNLOAD_MAX_TIME)
                 # 监听实际播放时长哦
                 live_play_time = random.randint(self.min_live_play_time,self.max_live_play_time)   #随机获取播放时间
                 start_time = time.time()
