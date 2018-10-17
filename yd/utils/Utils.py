@@ -129,8 +129,9 @@ def htmlToImages(url,pic_name,width=default_width,height=default_height,cmd=webk
     os.system(cmd % (pic_name, width, height, url))
     return pic_name
 
-def gettime(hour):
-    a = datetime.datetime.now().strftime("%Y-%m-%d")+" %2d:00:00"%hour
+def gettime(hour,mim=0,second=0):
+    '''当日时间'''
+    a = datetime.datetime.now().strftime("%Y-%m-%d")+" %2d:%d:%d"%(hour,mim,second)
     timeArray = time.strptime(a, "%Y-%m-%d %H:%M:%S")
     return time.mktime(timeArray)
 
