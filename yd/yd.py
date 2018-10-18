@@ -19,8 +19,8 @@ from utils.SqlUtil import Mysql
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.keys import Keys
-import tkinter
-import tkinter.messagebox
+import Tkinter as tkinter
+import tkMessageBox as tkMessageBox
 from ConfigParser import ConfigParser
 import sys
 reload(sys)
@@ -70,28 +70,28 @@ class YD:
     def __on_click(self):
         self.CLIENT_PHONE = self.__phone_text.get().lstrip()
         if len(self.CLIENT_PHONE) == 0:
-            tkinter.messagebox.showerror(u'错误', u'手机号码必须输入')
+            tkMessageBox.showerror(u'错误', u'手机号码必须输入')
             logger.error(u"手机号码必须输入!")
             return
         else:
             phone_pat = re.compile('^(1[3-9]\d)\d{8}$')
             res = re.search(phone_pat, self.CLIENT_PHONE)
             if not res:
-                tkinter.messagebox.showerror(u'错误', u'手机号码格式不正确！')
+                tkMessageBox.showerror(u'错误', u'手机号码格式不正确！')
                 self.CLIENT_PHONE = None
                 logger.error(u"手机号码格式不正确！")
                 return
         #回顾并发数
         concurrent_number = self.__concurrent_number.get().lstrip()
         if len(concurrent_number) == 0:
-            tkinter.messagebox.showerror(u'错误', u'开启浏览器回顾数量必须输入')
+            tkMessageBox.showerror(u'错误', u'开启浏览器回顾数量必须输入')
             logger.error(u"开启浏览器回顾数量必须输入!")
             return
         else:
             concurrent_pat = re.compile('^[1-9][0-5]?$')
             res_c = re.search(concurrent_pat, concurrent_number)
             if not res_c:
-                tkinter.messagebox.showerror(u'错误', u'开启浏览器回顾数必须为1到15之间的数值')
+                tkMessageBox.showerror(u'错误', u'开启浏览器回顾数必须为1到15之间的数值')
                 self.CLIENT_PHONE = None
                 logger.error(u"开启浏览器回顾数必须为1到15之间的数值！")
                 return
@@ -100,14 +100,14 @@ class YD:
         # 直播并发数
         live_concurrent_number = self.__live_concurrent_number.get().lstrip()
         if len(live_concurrent_number) == 0:
-            tkinter.messagebox.showerror(u'错误', u'开启浏览器直播数量必须输入')
+            tkMessageBox.showerror(u'错误', u'开启浏览器直播数量必须输入')
             logger.error(u"开启浏览器直播数量必须输入!")
             return
         else:
             live_concurrent_pat = re.compile('^[1-9][0-5]?$')
             res_c_l = re.search(live_concurrent_pat, live_concurrent_number)
             if not res_c_l:
-                tkinter.messagebox.showerror(u'错误', u'开启浏览器直播数必须为1到15之间的数值')
+                tkMessageBox.showerror(u'错误', u'开启浏览器直播数必须为1到15之间的数值')
                 self.CLIENT_PHONE = None
                 logger.error(u"开启浏览器直播数必须为1到15之间的数值！")
                 return
@@ -172,7 +172,7 @@ class YD:
         tkinter.Button(tk, text=u"点击确认", command=self.__on_click).pack()
         tk.mainloop()
         if not self.CLIENT_PHONE:
-            tkinter.messagebox.showerror(u'错误', u'手机号码或浏览器数量必须输入！')
+            tkMessageBox.showerror(u'错误', u'手机号码或浏览器数量必须输入！')
             logger.error(u"手机号码必须输入，退出程序")
             exit(-1)
     def __execInitParams(self):
@@ -198,7 +198,7 @@ class YD:
             #检查版本
             if self.__support_level > VERSION_LEVEL:
                 message = u'请升级到最新版本:%s，当前版本%s，下载地址见文档:http://doc.pages.talkedu.cn/hzb/' %(self.__last_version,VERSION)
-                tkinter.messagebox.showerror(u'错误', message)
+                tkMessageBox.showerror(u'错误', message)
                 logger.error(message)
                 exit(-1)
         finally:
