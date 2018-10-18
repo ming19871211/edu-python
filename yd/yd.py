@@ -50,8 +50,8 @@ LIVE_SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user
 total = 0
 fail_total = 0
 #版本号、版本等级
-VERSION = "1.4.1"
-VERSION_LEVEL = 4
+VERSION = "1.5.1"
+VERSION_LEVEL = 5
 
 class YD:
     def __init__(self):
