@@ -193,6 +193,10 @@ class YD:
                     self.__min_live_play_time = int(param_value)
                 elif param_name == 'max_live_play_time':
                     self.__max_live_play_time = int(param_value)
+                elif param_name == 'process_max_num':
+                    self.__process_max_num = int(param_value)
+                elif param_name == 'process_pause_time':
+                    self.__process_pause_time = int(param_value)
 
             self.__query_time = time.time()
             #检查版本
@@ -214,6 +218,24 @@ class YD:
             return True
         else:
             return False
+    def isOutMaxProcessNum(self):
+        '''是否超出最大占用数'''
+        sql = 'SELECT count(1) FROM `t_hzb_course` where client_phone=%s and state =%s'
+        mysql = Mysql()
+        try:
+            num = mysql.getOne(sql,(self.CLIENT_PHONE,1))
+        except:
+            mysql.close()
+        if num > self.__process_max_num:
+            logger.warning(u'您播放刷课失败次数太多，当前占用的刷课数量%d大于最大刷课占用数量%d，暂时暂停您的播放时间%dmim。请检查您的电脑和网络是否有问题！',
+                           num,self.__process_max_num,self.__process_pause_time)
+            # tk = tkinter.Tk()
+            # tkMessageBox.showinfo(u'错误', '请检查您的电脑和网络是否有问题！')
+            # tk.destroy()
+            # exit(-1)
+            time.sleep(self.__process_pause_time*60)
+            logger.info(u'暂停时间到了，恢复您的刷课播放！')
+            return True
 
     def scrapyAll(self,select_sql=SELECT_SQL,live_select_sql=LIVE_SELECT_SQL,thread_num=None,live_thread_num=None):
         thread_num = thread_num if thread_num else self.CONCURRENT_NUMBER
@@ -221,17 +243,26 @@ class YD:
         logger.info(u'[您已成功开启和教育直播视频软件正式版本]--您的手机号是:%s 当前运行版本:%s 最新版本:%s 回顾开启浏览器数:%s 直播开启浏览器数量:%s',
                     self.CLIENT_PHONE,VERSION,self.__last_version,thread_num,self.LIVE_CONCURRENT_NUMBER)
         count = 1
+        process_loop_num =0
         global total,fail_total
         while count:
             count = 0
             if self.isNotRunTime(): break
+            # 检验此手机号码刷课是否存在异常,每循环3次检查一次
+            if process_loop_num%3 == 0 and self.isOutMaxProcessNum():
+                process_loop_num = 0
+                break
+            else:
+                process_loop_num += 1
             mysql = Mysql()
             try:
+                #获取直播数据
                 rows = mysql.getAll(live_select_sql, (0,live_thread_num))
                 if rows:
                     self.is_live = True
                 else:
                     self.is_live = False
+                    #获取回顾数据
                     rows = mysql.getAll(select_sql,(0,thread_num))
                 if rows:
                     params = []
