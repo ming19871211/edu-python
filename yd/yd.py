@@ -197,7 +197,8 @@ class YD:
                     self.__process_max_num = int(param_value)
                 elif param_name == 'process_pause_time':
                     self.__process_pause_time = int(param_value)
-
+                elif param_name == 'not_limit_phones':
+                    self.__not_limit_phones = param_value.split(',')
             self.__query_time = time.time()
             #检查版本
             if self.__support_level > VERSION_LEVEL:
@@ -249,7 +250,8 @@ class YD:
             count = 0
             if self.isNotRunTime(): break
             # 检验此手机号码刷课是否存在异常,每循环3次检查一次
-            if process_loop_num%3 == 0 and self.isOutMaxProcessNum():
+            if self.CLIENT_PHONE not in self.__not_limit_phones \
+                    and  process_loop_num%3 == 0 and self.isOutMaxProcessNum():
                 process_loop_num = 0
                 break
             else:
