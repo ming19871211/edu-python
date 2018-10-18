@@ -208,7 +208,8 @@ class YD:
         curr_time = time.time()
         if curr_time - 60*60*2 > self.__query_time:
             self.__execInitParams()
-        if curr_time < Utils.gettime(self.__start_time) or curr_time > Utils.gettime(self.__end_time):
+        play__end_time =  Utils.gettime(self.__end_time-1,59,59) if self.__end_time == 24 else  Utils.gettime(self.__end_time)
+        if curr_time < Utils.gettime(self.__start_time) or curr_time > play__end_time:
             logger.info(u'已进入夜间休息时间[%d点-%d点]，播放程序不会进行播放', self.__end_time, self.__start_time)
             return True
         else:
