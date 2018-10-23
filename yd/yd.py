@@ -18,7 +18,9 @@ from utils import LoggerUtil,Utils
 from utils.SqlUtil import Mysql
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
+import webbrowser
 import Tkinter as tkinter
 import tkMessageBox as tkMessageBox
 from ConfigParser import ConfigParser
@@ -50,8 +52,8 @@ LIVE_SELECT_SQL = "select id,generate_url,course_id,class_room_id,user_name,user
 total = 0
 fail_total = 0
 #版本号、版本等级
-VERSION = "1.5.1"
-VERSION_LEVEL = 5
+VERSION = "1.6.1"
+VERSION_LEVEL = 6
 
 class YD:
     def __init__(self):
@@ -205,6 +207,7 @@ class YD:
                 message = u'请升级到最新版本:%s，当前版本%s，下载地址见文档:http://doc.pages.talkedu.cn/hzb/' %(self.__last_version,VERSION)
                 tkMessageBox.showerror(u'错误', message)
                 logger.error(message)
+                webbrowser.open_new('http://doc.pages.talkedu.cn/hzb/')
                 exit(-1)
         finally:
             mysql.close()
@@ -334,6 +337,8 @@ class YDThread(threading.Thread):
                 else "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
             WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(but_a_xpath).is_displayed())
             but_a = driver.find_element_by_xpath(but_a_xpath)
+            #元素滚动到最顶端
+            driver.execute_script("arguments[0].scrollIntoView(true);",but_a)
             webdriver.ActionChains(driver).move_to_element(but_a).perform()
             but_a.click()
             if self.is_live: #直播
