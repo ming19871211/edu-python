@@ -377,7 +377,7 @@ class HZBThread(threading.Thread):
                     real_play_time = time.time()-start_time
                 logger.info(u'%s-%s,播放结束哦了！目标播放时间：%d s，实际播放时间: %d s',user_name,user_mobile,play_time,real_play_time)
             try:
-                rs = requests.get(URL_UPDATE_COURSE %(id,user_id,2,self.rs['playType'],real_play_time))
+                rs = requests.get(URL_UPDATE_COURSE %(id,user_id,2,self.rs['playType'],int(real_play_time)))
             except Exception:
                 logger.exception(u'观看视频完成更新时异常')
         except Exception as e:
