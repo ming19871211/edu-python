@@ -16,6 +16,7 @@ import json
 from bs4 import BeautifulSoup #lxml解析器
 from utils import LoggerUtil,Utils
 from utils.SqlUtil import Mysql
+from ip_proxy import *
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.action_chains import ActionChains
@@ -282,8 +283,12 @@ class YD:
                     except Exception:
                         mysql.rollback()
                         logger.exception(u'修改数据状态异常！')
+                    # proxy = FeiyiProxy()
+                    # proxy = WanDouProxy()
                     for rs in rows:
-                        YDThread(rs,self.CLIENT_PHONE,self.is_live,self.__min_live_play_time,self.__max_live_play_time).start()
+                        # ip_info = proxy.getProxyIP()
+                        ip_info = None
+                        YDThread(rs,self.CLIENT_PHONE,self.is_live,self.__min_live_play_time,self.__max_live_play_time,ip_info).start()
                 else:
                     logger.info(u'客服端手机号码:%s,当前时间已没有可以播放的直播或者回顾的视频了哦！',self.CLIENT_PHONE)
                     break
@@ -297,13 +302,15 @@ class YD:
             logger.info(u'客服端手机号码:%s,合计处理访问数量%d，成功数量%d，失败数量:%d',self.CLIENT_PHONE,total,total-fail_total,fail_total)
 
 class YDThread(threading.Thread):
-    def __init__(self,rs,CLIENT_PHONE,is_live,min_live_play_time,max_live_play_time):
+    def __init__(self,rs,CLIENT_PHONE,is_live,min_live_play_time,max_live_play_time,ip_info=None):
         threading.Thread.__init__(self)
         self.rs = rs
         self.CLIENT_PHONE = CLIENT_PHONE
         self.is_live = is_live
         self.min_live_play_time= min_live_play_time
         self.max_live_play_time = max_live_play_time
+        self.ip_info = ip_info
+
 
     def __startChrome(self):
         # 启动chrome的flash播放器
@@ -315,6 +322,9 @@ class YDThread(threading.Thread):
         }
         chromeOptions = webdriver.ChromeOptions()
         chromeOptions.add_experimental_option('prefs', prefs)
+        if self.ip_info:
+            chromeOptions.add_argument("--proxy-server=http://%s:%s" % (self.ip_info['ip'],self.ip_info['port']))
+            chromeOptions.add_argument('%s=%s' % self.ip_info['proxy-auth'])
         driver = webdriver.Chrome(chrome_options=chromeOptions)
         return driver
 
@@ -332,6 +342,7 @@ class YDThread(threading.Thread):
             driver.maximize_window()
             driver.get(generate_url)
             driver.implicitly_wait(10)
+            time.sleep(100000)
             #选择需要播放的视频
             but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toWatch(%s,%s);'][@class='but_a']" % (course_id, class_room_id) if self.is_live \
                 else "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
