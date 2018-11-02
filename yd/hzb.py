@@ -43,7 +43,7 @@ LIVE_CONCURRENT_NUMBER =  int(getCFG('LIVE_CONCURRENT_NUMBER',5))
 WAIT_DOWNLOAD_MAX_TIME = int(getCFG('WAIT_DOWNLOAD_MAX_TIME',300))
 client_phone = getCFG('CLIENT_PHONE')
 
-URL_HOST = 'hzb.ucenter.talkedu.cn'
+URL_HOST = getCFG('URL_HOST','hzb.ucenter.talkedu.cn')
 # URL_HOST = '192.168.26.30:8080/lsmb-wechat/'
 #获取和直播参数
 URL_HZB_PARAMS='http://'+URL_HOST+'/course/queryHzbparams'
