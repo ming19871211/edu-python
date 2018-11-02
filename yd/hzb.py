@@ -54,8 +54,8 @@ URL_UPDATE_COURSE='http://'+URL_HOST+'/course/updateHzbCourseState?id=%s&userId=
 total = 0
 fail_total = 0
 #版本号、版本等级
-VERSION = "1.7.1"
-VERSION_LEVEL = 7
+VERSION = "1.8.1"
+VERSION_LEVEL = 8
 
 class HZB:
     def __init__(self):
@@ -181,6 +181,7 @@ class HZB:
             exit(-1)
     def __execInitParams(self):
         '''初始化参数'''
+        print URL_HZB_PARAMS
         rs = requests.get(URL_HZB_PARAMS).json()
         if rs['code'] == '0':
             for p in rs['data']:
