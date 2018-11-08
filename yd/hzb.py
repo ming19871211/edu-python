@@ -288,6 +288,7 @@ class HZBThread(threading.Thread):
                 respon = requests.get('http://www.cip.cc',proxies=proxies,timeout=5)
                 str = re.findall(u'<div\s*class="data\s*kq-well">\s*<pre>(.+?)</pre>\s*</div>', respon.text, re.M | re.S | re.I)[0]
                 self.address = re.findall(u'数据三\s*:\s*(.+?)\n', str, re.M)[0]
+                break;
             except Exception as e:
                 err_count +=1
                 if err_count >=3:
@@ -308,6 +309,7 @@ class HZBThread(threading.Thread):
             (self.rs['id'],self.rs['generateUrl'],self.rs['courseId'],self.rs['classRoomId'],self.rs['userName'],
              self.rs['userId'],self.rs['userMobile'],self.rs['playTime'])
         try:
+            logger.info(u'准备开启浏览器了')
             driver = self.__startChrome()
             driver.maximize_window()
             generate_url = generate_url.replace('&amp;','&')
