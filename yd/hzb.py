@@ -13,12 +13,9 @@ import datetime
 import json
 from bs4 import BeautifulSoup #lxml解析器
 from utils import LoggerUtil,Utils
-from utils.SqlUtil import Mysql
 from ip_proxy import *
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.keys import Keys
 import webbrowser
 import Tkinter as tkinter
 import tkMessageBox as tkMessageBox
@@ -50,7 +47,9 @@ URL_HZB_PARAMS='http://'+URL_HOST+'/course/queryHzbparams'
 #获取课程
 URL_HZB_COURSE='http://'+URL_HOST+'/course/queryHzbCourseInfo?clientPhone=%s&hbQueryNum=%s&zbQueryNum=%s'
 #更新状态
-URL_UPDATE_COURSE='http://'+URL_HOST+'/course/updateHzbCourseState?id=%s&userId=%s&state=%s&playType=%s&realPlayTime=%s'
+URL_UPDATE_COURSE='http://'+URL_HOST+'/course/updateHzbCourseState?id=%s&userId=%s&state=%s&playType=%s&realPlayTime=%s&clientAddr=%s'
+#更新异常状态为未播放
+URL_UPDATE_ERR_COURSE='http://'+URL_HOST+'/course/updateHzbCourseState?id=%s&userId=%s&state=%s'
 total = 0
 fail_total = 0
 #版本号、版本等级
@@ -276,10 +275,24 @@ class HZBThread(threading.Thread):
         }
         chromeOptions = webdriver.ChromeOptions()
         chromeOptions.add_experimental_option('prefs', prefs)
+        proxies = None
         if self.rs['clientIp'] and self.rs['port']:
             logger.info('代理IP：%s:%s', self.rs['clientIp'], self.rs['port'])
             chromeOptions.add_argument("--proxy-server=http://%s:%s" % (self.rs['clientIp'],self.rs['port']))
             # chromeOptions.add_argument('%s=%s' % self.ip_info['proxy-auth'])
+            proxies={'http': 'http://%s:%s'%(self.rs['clientIp'],self.rs['port'])}
+        #获取请求的IP地址
+        err_count = 0
+        while err_count < 3:
+            try:
+                respon = requests.get('http://www.cip.cc',proxies=proxies,timeout=5)
+                str = re.findall(u'<div\s*class="data\s*kq-well">\s*<pre>(.+?)</pre>\s*</div>', respon.text, re.M | re.S | re.I)[0]
+                self.address = re.findall(u'数据三\s*:\s*(.+?)\n', str, re.M)[0]
+            except Exception as e:
+                err_count +=1
+                if err_count >=3:
+                    logger.warning(u'网络连接异常：代理IP：%s:%s',self.rs['clientIp'],self.rs['port'])
+                    raise e
         driver = webdriver.Chrome(chrome_options=chromeOptions)
         return driver
 
@@ -378,13 +391,17 @@ class HZBThread(threading.Thread):
                     real_play_time = time.time()-start_time
                 logger.info(u'%s-%s,播放结束哦了！目标播放时间：%d s，实际播放时间: %d s',user_name,user_mobile,play_time,real_play_time)
             try:
-                rs = requests.get(URL_UPDATE_COURSE %(id,user_id,2,self.rs['playType'],int(real_play_time)))
+                url_update_course= URL_UPDATE_COURSE %(id,user_id,2,self.rs['playType'],int(real_play_time),self.address)
+                if self.rs['clientIp'] and self.rs['port']:
+                    url_update_course += u'&clientIp=%s&port=%s'%(self.rs['clientIp'],self.rs['port'])
+                rs = requests.get(url_update_course)
             except Exception:
                 logger.exception(u'观看视频完成更新时异常')
         except Exception as e:
             global fail_total
             fail_total += 1
             logger.exception(u'视频播放出现问题！,异常信息:%s',e.message)
+            rs = requests.get(URL_UPDATE_ERR_COURSE % (id, user_id, 1))
         finally:
             self.__closeChrome(driver)
 
