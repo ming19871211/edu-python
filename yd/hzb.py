@@ -53,8 +53,8 @@ URL_UPDATE_ERR_COURSE='http://'+URL_HOST+'/course/updateHzbCourseState?id=%s&use
 total = 0
 fail_total = 0
 #版本号、版本等级
-VERSION = "1.8.1"
-VERSION_LEVEL = 8
+VERSION = "1.9.1"
+VERSION_LEVEL = 9
 
 class HZB:
     def __init__(self):
