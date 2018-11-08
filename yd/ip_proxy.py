@@ -67,7 +67,7 @@ class WanDouProxy:
 
 if __name__ == '__main__':
     feiyiProxy = FeiyiProxy()
-    # feiyiPoxy.test()
+    #  feiyiProxy.getProxyIP()
     # print feiyiPoxy.getProxyIP()
-    wandouProxy = WanDouProxy()
-    wandouProxy.getProxyIP()
+    # wandouProxy = WanDouProxy()
+    # wandouProxy.getProxyIP()
