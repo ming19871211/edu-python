@@ -403,7 +403,8 @@ class HZBThread(threading.Thread):
             global fail_total
             fail_total += 1
             logger.exception(u'视频播放出现问题！,异常信息:%s',e.message)
-            rs = requests.get(URL_UPDATE_ERR_COURSE % (id, user_id, 1))
+            rs = requests.get(URL_UPDATE_ERR_COURSE % (id, user_id, 0))
+            print rs.text
         finally:
             self.__closeChrome(driver)
 
