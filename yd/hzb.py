@@ -53,7 +53,7 @@ URL_UPDATE_ERR_COURSE='http://'+URL_HOST+'/course/updateHzbCourseState?id=%s&use
 total = 0
 fail_total = 0
 #版本号、版本等级
-VERSION = "1.9.1"
+VERSION = "1.9.2"
 VERSION_LEVEL = 9
 REAL_CLIENT_ADDR=None
 class HZB:
