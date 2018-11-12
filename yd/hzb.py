@@ -55,7 +55,7 @@ fail_total = 0
 #版本号、版本等级
 VERSION = "1.9.1"
 VERSION_LEVEL = 9
-
+REAL_CLIENT_ADDR=None
 class HZB:
     def __init__(self):
         path_str = os.getenv('path')
@@ -282,18 +282,22 @@ class HZBThread(threading.Thread):
             # chromeOptions.add_argument('%s=%s' % self.ip_info['proxy-auth'])
             proxies={'http': 'http://%s:%s'%(self.rs['clientIp'],self.rs['port'])}
         #获取请求的IP地址
-        err_count = 0
-        while err_count < 3:
-            try:
-                respon = requests.get('http://www.cip.cc',proxies=proxies,timeout=5)
-                str = re.findall(u'<div\s*class="data\s*kq-well">\s*<pre>(.+?)</pre>\s*</div>', respon.text, re.M | re.S | re.I)[0]
-                self.address = re.findall(u'数据三\s*:\s*(.+?)\n', str, re.M)[0]
-                break;
-            except Exception as e:
-                err_count +=1
-                if err_count >=3:
-                    logger.warning(u'网络连接异常：代理IP：%s:%s',self.rs['clientIp'],self.rs['port'])
-                    raise e
+        if proxies:
+            err_count = 0
+            while err_count < 3:
+                try:
+                    respon = requests.get('http://www.cip.cc',proxies=proxies,timeout=5)
+                    str = re.findall(u'<div\s*class="data\s*kq-well">\s*<pre>(.+?)</pre>\s*</div>', respon.text, re.M | re.S | re.I)[0]
+                    self.address = re.findall(u'数据三\s*:\s*(.+?)\n', str, re.M)[0]
+                    break;
+                except Exception as e:
+                    err_count +=1
+                    if err_count >=3:
+                        logger.exception(u'网络连接异常：代理IP：%s:%s',self.rs['clientIp'],self.rs['port'])
+                        raise e
+        else:
+            global REAL_CLIENT_ADDR
+            self.address = REAL_CLIENT_ADDR
         driver = webdriver.Chrome(chrome_options=chromeOptions)
         return driver
 
@@ -413,6 +417,9 @@ def getSecond(str):
     return int(a)*60+int(b)
 
 if __name__ == '__main__':
+    respon = requests.get('http://www.cip.cc', timeout=5)
+    str = re.findall(u'<div\s*class="data\s*kq-well">\s*<pre>(.+?)</pre>\s*</div>', respon.text, re.M | re.S | re.I)[0]
+    REAL_CLIENT_ADDR = re.findall(u'数据三\s*:\s*(.+?)\n', str, re.M)[0]
     hzb = HZB()
     sleep_time= 5
     error_time= 1
