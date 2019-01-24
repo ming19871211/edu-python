@@ -198,6 +198,10 @@ class HZB:
                     self.__min_live_play_time = int(param_value)
                 elif param_name == 'max_live_play_time':
                     self.__max_live_play_time = int(param_value)
+                elif param_name == 'min_play_time':
+                    self.__min_play_time = int(param_value)
+                elif param_name == 'max_play_time':
+                    self.__max_play_time = int(param_value)
                 elif param_name == 'process_max_num':
                     self.__process_max_num = int(param_value)
                 elif param_name == 'process_pause_time':
@@ -243,7 +247,7 @@ class HZB:
                 rows = rs['data']
                 if rows:
                     for r in rows:
-                        HZBThread(r,self.CLIENT_PHONE, self.__min_live_play_time, self.__max_live_play_time).start()
+                        HZBThread(r,self.CLIENT_PHONE, self.__min_live_play_time, self.__max_live_play_time,self.__min_play_time,self.__max_play_time).start()
                         count+=1
                 else:
                     logger.info(u'客服端手机号码:%s,当前时间已没有可以播放的直播或者回顾的视频了哦！', self.CLIENT_PHONE)
@@ -258,12 +262,14 @@ class HZB:
             logger.info(u'客服端手机号码:%s,合计处理访问数量%d，成功数量%d，失败数量:%d',self.CLIENT_PHONE,total,total-fail_total,fail_total)
 
 class HZBThread(threading.Thread):
-    def __init__(self,rs,CLIENT_PHONE,min_live_play_time,max_live_play_time):
+    def __init__(self,rs,CLIENT_PHONE,min_live_play_time,max_live_play_time,min_play_time,max_play_time):
         threading.Thread.__init__(self)
         self.rs = rs
         self.CLIENT_PHONE = CLIENT_PHONE
         self.min_live_play_time= min_live_play_time
         self.max_live_play_time = max_live_play_time
+        self.min_play_time=min_play_time
+        self.max_play_time=max_play_time
 
     def __startChrome(self):
         # 启动chrome的flash播放器
@@ -377,6 +383,8 @@ class HZBThread(threading.Thread):
                 real_play_time = time.time() - start_time
                 time_one1_xpath = "//div[@class='play_time']/span[@class='time_one1']"
                 time_one1 = driver.find_element_by_xpath(time_one1_xpath)
+                #随机生成回顾播放时间
+                play_time = random.randint(self.min_play_time, self.max_play_time)  # 随机获取播放时间
                 #防止睡眠时间太长无法唤醒
                 curr_play_time =  -1
                 while real_play_time < play_time:
@@ -384,7 +392,7 @@ class HZBThread(threading.Thread):
                     if tmp_play_time <= curr_play_time:
                         curr_play_time = tmp_play_time
                         logger.error(u'播放出现了停止现象！')
-                        if curr_play_time > 180:
+                        if curr_play_time > self.min_play_time:
                             break
                         else:
                             raise Exception(u'播放出现了停止现象！%s-%s 实际播放时间:%d s',user_name,user_mobile,curr_play_time)
