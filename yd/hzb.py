@@ -384,7 +384,7 @@ class HZBThread(threading.Thread):
                 time_one1_xpath = "//div[@class='play_time']/span[@class='time_one1']"
                 time_one1 = driver.find_element_by_xpath(time_one1_xpath)
                 #随机生成回顾播放时间
-                play_time = random.randint(self.min_play_time, self.max_play_time)  # 随机获取播放时间
+                play_time = play_time if (play_time and play_time) > 0  else random.randint(self.min_play_time, self.max_play_time)  # 随机获取播放时间
                 #防止睡眠时间太长无法唤醒
                 curr_play_time =  -1
                 while real_play_time < play_time:
