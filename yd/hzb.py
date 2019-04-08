@@ -49,7 +49,7 @@ URL_HZB_COURSE='http://'+URL_HOST+'/course/queryHzbCourseInfo?clientPhone=%s&hbQ
 #更新状态
 URL_UPDATE_COURSE='http://'+URL_HOST+'/course/updateHzbCourseState?id=%s&userId=%s&state=%s&playType=%s&realPlayTime=%s&clientAddr=%s'
 #更新异常状态为未播放
-URL_UPDATE_ERR_COURSE='http://'+URL_HOST+'/course/updateHzbCourseState?id=%s&userId=%s&state=%s'
+URL_UPDATE_ERR_COURSE='http://'+URL_HOST+'/course/updateHzbCourseState?id=%s&userId=%s&state=%s&realPlayTime=%s&clientAddr=%s'
 total = 0
 fail_total = 0
 #版本号、版本等级
@@ -318,6 +318,7 @@ class HZBThread(threading.Thread):
         id,generate_url,course_id, class_room_id, user_name, user_id, user_mobile, play_time = \
             (self.rs['id'],self.rs['generateUrl'],self.rs['courseId'],self.rs['classRoomId'],self.rs['userName'],
              self.rs['userId'],self.rs['userMobile'],self.rs['playTime'])
+        err_curr_play_time=0
         try:
             logger.info(u'准备开启浏览器了')
             driver = self.__startChrome()
@@ -325,9 +326,19 @@ class HZBThread(threading.Thread):
             generate_url = generate_url.replace('&amp;','&')
             driver.get(generate_url)
             driver.implicitly_wait(10)
+            #点击查看全部课程
+            but_more_xpath = "//div[@class='neirong']//div[@onclick='roomMoreShow()'][@class='lookallcur']"
+            WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(but_more_xpath).is_displayed())
+            but_more = driver.find_element_by_xpath(but_more_xpath)
+            # 元素滚动到最顶端
+            driver.execute_script("arguments[0].scrollIntoView(true);", but_more)
+            webdriver.ActionChains(driver).move_to_element(but_more).perform()
+            but_more.click()
+
             #选择需要播放的视频
             but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toWatch(%s,%s);'][@class='but_a']" % (course_id, class_room_id) if self.rs['playType'] == 1 \
                 else "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
+            logger.info(but_a_xpath)
             WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(but_a_xpath).is_displayed())
             but_a = driver.find_element_by_xpath(but_a_xpath)
             #元素滚动到最顶端
@@ -395,6 +406,7 @@ class HZBThread(threading.Thread):
                         if curr_play_time > self.min_play_time:
                             break
                         else:
+                            err_curr_play_time=curr_play_time
                             raise Exception(u'播放出现了停止现象！%s-%s 实际播放时间:%d s',user_name,user_mobile,curr_play_time)
                     else:
                         curr_play_time = tmp_play_time
@@ -415,7 +427,7 @@ class HZBThread(threading.Thread):
             global fail_total
             fail_total += 1
             logger.exception(u'视频播放出现问题！,异常信息:%s',e.message)
-            rs = requests.get(URL_UPDATE_ERR_COURSE % (id, user_id, 0))
+            rs = requests.get(URL_UPDATE_ERR_COURSE % (id, user_id, 0,err_curr_play_time,self.address))
             print rs.text
         finally:
             self.__closeChrome(driver)
