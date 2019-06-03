@@ -53,7 +53,7 @@ URL_UPDATE_ERR_COURSE='http://'+URL_HOST+'/course/updateHzbCourseState?id=%s&use
 total = 0
 fail_total = 0
 #版本号、版本等级
-VERSION = "1.10.1"
+VERSION = "1.10.2"
 VERSION_LEVEL = 10
 REAL_CLIENT_ADDR=None
 class HZB:
@@ -220,6 +220,7 @@ class HZB:
             logger.error(u'获取初始化参数失败,返回错误信息%s',rs['msg'])
             raise Exception(u'获取初始化参数失败')
 
+
     def isNotRunTime(self):
         curr_time = time.time()
         if curr_time - 60*60*2 > self.__query_time:
@@ -326,14 +327,19 @@ class HZBThread(threading.Thread):
             generate_url = generate_url.replace('&amp;','&')
             driver.get(generate_url)
             driver.implicitly_wait(10)
-            #点击查看全部课程
-            but_more_xpath = "//div[@class='neirong']//div[@onclick='roomMoreShow()'][@class='lookallcur']"
-            WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(but_more_xpath).is_displayed())
-            but_more = driver.find_element_by_xpath(but_more_xpath)
-            # 元素滚动到最顶端
-            driver.execute_script("arguments[0].scrollIntoView(true);", but_more)
-            webdriver.ActionChains(driver).move_to_element(but_more).perform()
-            but_more.click()
+
+            try:
+                # if  driver.find_element_by_xpath(but_more_xpath): #确认是否有点击查看全部课程
+                but_more_xpath = "//div[@class='neirong']//div[@onclick='roomMoreShow()'][@class='lookallcur']"
+                #点击查看全部课程
+                WebDriverWait(driver, 6).until(lambda x: x.find_element_by_xpath(but_more_xpath).is_displayed())
+                but_more = driver.find_element_by_xpath(but_more_xpath)
+                # 元素滚动到最顶端
+                driver.execute_script("arguments[0].scrollIntoView(true);", but_more)
+                webdriver.ActionChains(driver).move_to_element(but_more).perform()
+                but_more.click()
+            except Exception :
+                logger.info(u'没有点击查看全部课程的按钮哦')
 
             #选择需要播放的视频
             but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toWatch(%s,%s);'][@class='but_a']" % (course_id, class_room_id) if self.rs['playType'] == 1 \
