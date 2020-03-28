@@ -342,9 +342,12 @@ class HZBThread(threading.Thread):
                 logger.info(u'没有点击查看全部课程的按钮哦')
 
             #选择需要播放的视频
-            but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toWatch(%s,%s);'][@class='but_a']" % (course_id, class_room_id) if self.rs['playType'] == 1 \
-                else "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
-            logger.info(but_a_xpath)
+            # but_a_xpath = "//div[@class='neirong']//a[@href='javascript:toWatch(%s,%s);'][@class='but_a']" % (course_id, class_room_id) if self.rs['playType'] == 1 \
+            #     else "//div[@class='neirong']//a[@href='javascript:toReview(%s,%s);'][@class='but_a']" %(course_id,class_room_id)
+
+            but_a_xpath = "//div[@class='container']//div[contains(@class, 'main') and contains(@class, 'classdetailsMain')]//a[@href='javascript:toWatch(%s,%s,1);']" % (course_id, class_room_id) if self.rs['playType'] == 1 \
+                else "//div[@class='container']//div[contains(@class, 'main') and contains(@class, 'classdetailsMain')]//a[@href='javascript:toReview(%s,%s,1);']" % (course_id, class_room_id)
+            # print  but_a_xpath
             WebDriverWait(driver, 10).until(lambda x: x.find_element_by_xpath(but_a_xpath).is_displayed())
             but_a = driver.find_element_by_xpath(but_a_xpath)
             #元素滚动到最顶端
@@ -443,9 +446,30 @@ def getSecond(str):
     return int(a)*60+int(b)
 
 if __name__ == '__main__':
-    respon = requests.get('http://www.cip.cc', timeout=5)
-    str = re.findall(u'<div\s*class="data\s*kq-well">\s*<pre>(.+?)</pre>\s*</div>', respon.text, re.M | re.S | re.I)[0]
-    REAL_CLIENT_ADDR = re.findall(u'数据三\s*:\s*(.+?)\n', str, re.M)[0]
+
+    try:
+        headers = {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
+            'Host': '2020.ip138.com',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36'}
+        respon = requests.get('http://2020.ip138.com', timeout=5, headers=headers)
+        str = re.findall(u'<title>\s*.*：(.+?)</title>', respon.text, re.M | re.S | re.I)[0]
+        REAL_CLIENT_ADDR = str
+    except Exception:
+        try:
+            headers = {'Accept': '*/*','Host': 'www.cip.cc', 'User-Agent': 'curl/7.58.0'}
+            respon = requests.get('www.cip.cc', timeout=5, headers=headers)
+            # str = re.findall(u'<div\s*class="data\s*kq-well">\s*<pre>(.+?)</pre>\s*</div>', respon.text, re.M | re.S | re.I)[0]
+            str=respon.text;
+            REAL_CLIENT_ADDR = re.findall(u'数据三\s*:\s*(.+?)\n', str, re.M)[0]
+        except Exception:
+            try:
+                headers = {'Accept': '*/*','Host': 'ifconfig.me', 'User-Agent': 'curl/7.58.0'}
+                respon = requests.get('ifconfig.me', timeout=5,headers=headers)
+                REAL_CLIENT_ADDR=respon.text;
+            except Exception:
+                REAL_CLIENT_ADDR = "没有获取ip地址哦！"
+
     hzb = HZB()
     sleep_time= 5
     error_time= 1
