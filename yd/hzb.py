@@ -456,18 +456,21 @@ if __name__ == '__main__':
         str = re.findall(u'<title>\s*.*：(.+?)</title>', respon.text, re.M | re.S | re.I)[0]
         REAL_CLIENT_ADDR = str
     except Exception:
+        logger.warning("通过http://2020.ip138.com获取ip失败")
         try:
             headers = {'Accept': '*/*','Host': 'www.cip.cc', 'User-Agent': 'curl/7.58.0'}
-            respon = requests.get('www.cip.cc', timeout=5, headers=headers)
+            respon = requests.get('https://www.cip.cc', timeout=5, headers=headers)
             # str = re.findall(u'<div\s*class="data\s*kq-well">\s*<pre>(.+?)</pre>\s*</div>', respon.text, re.M | re.S | re.I)[0]
             str=respon.text;
             REAL_CLIENT_ADDR = re.findall(u'数据三\s*:\s*(.+?)\n', str, re.M)[0]
         except Exception:
+            logger.warning("通过https://www.cip.cc获取ip失败")
             try:
                 headers = {'Accept': '*/*','Host': 'ifconfig.me', 'User-Agent': 'curl/7.58.0'}
-                respon = requests.get('ifconfig.me', timeout=5,headers=headers)
+                respon = requests.get('http://ifconfig.me', timeout=5,headers=headers)
                 REAL_CLIENT_ADDR=respon.text;
             except Exception:
+                logger.warning("通过http://ifconfig.me获取ip失败")
                 REAL_CLIENT_ADDR = "没有获取ip地址哦！"
 
     hzb = HZB()
