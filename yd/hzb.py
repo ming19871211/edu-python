@@ -409,7 +409,7 @@ class HZBThread(threading.Thread):
                 curr_play_time =  -1
                 while real_play_time < play_time:
                     tmp_play_time =  getSecond(time_one1.text)
-                    if tmp_play_time <= curr_play_time:
+                    if tmp_play_time < curr_play_time:
                         curr_play_time = tmp_play_time
                         logger.error(u'播放出现了停止现象！')
                         if curr_play_time > self.min_play_time:
